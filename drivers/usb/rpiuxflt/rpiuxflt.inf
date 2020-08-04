@@ -1,0 +1,77 @@
+; NOTE: When test signing during development, the signing certificate must be
+; installed as a trusted root and the AllSigningEqual Group Policy registry
+; key must be enabled.
+
+[Version]
+Signature = "$Windows NT$"
+Class = USB
+ClassGUID = {36FC9E60-C465-11CF-8056-444553540000}
+Provider = %ProviderString%
+CatalogFile = rpiuxflt.cat
+PnpLockdown = 1
+
+[SourceDisksNames]
+3426 = windows cd
+
+[SourceDisksFiles]
+rpiuxflt.sys = 3426
+
+[DestinationDirs]
+DefaultDestDir = 12
+
+[Manufacturer]
+%RPi% = RPi,NT$ARCH$.10.0
+
+[RPi.NT$ARCH$.10.0]
+%rpixhci.DeviceDesc% = FilterInstall, ACPI\PNP0D10
+
+[FilterInstall.NT]
+Include = usbxhci.inf
+Needs = Generic.Install.NT
+AddReg = DeviceFlags.AddReg
+CopyFiles = FilterInstall.NT.Copy
+FeatureScore = 00
+
+[FilterInstall.NT.HW]
+Include = usbxhci.inf
+Needs = Generic.Install.NT.HW
+AddReg = FilterInstall.NT.HW.AddReg
+
+[FilterInstall.NT.Services]
+Include = usbxhci.inf
+Needs = Generic.Install.NT.Services
+AddService = rpiuxflt,,FilterInstall.AddService
+
+[FilterInstall.NT.WMI]
+Include = usbxhci.inf
+Needs = Generic.Install.NT.WMI
+
+[DeviceFlags.AddReg]
+; Workaround to set device flags as used in usb\DisableFlags.ps1 from the HLK.
+; Use flags normally set for a 1106:3483 device enumerated by PCI plus Use32BitRegisterAccess.
+; The !usb3kd.xhci_capability debugger extension command lists names of active flags.
+HKLM,System\CurrentControlSet\Control\Compatibility\Device\USBXHCI:ACPI!VEN_PNP&DEV_0D10,\
+    USBXHCI,0xB0001,0x70000000003
+
+[FilterInstall.NT.Copy]
+rpiuxflt.sys
+
+[FilterInstall.NT.HW.AddReg]
+HKR,,LowerFilters,0x00010000,"rpiuxflt"
+
+[FilterInstall.AddService]
+DisplayName = %rpiuxflt.SvcDesc%
+ServiceType = 1
+StartType = 3
+ErrorControl = 1
+ServiceBinary = %12%\rpiuxflt.sys
+AddReg = rpiuxflt.AddReg
+
+[rpiuxflt.AddReg]
+HKR,,BootFlags,0x10001,16
+
+[Strings]
+ProviderString = "Open Source"
+RPi = "Raspbery Pi"
+rpixhci.DeviceDesc = "Raspberry Pi 4 VIA VL805 XHCI Host Controller"
+rpiuxflt.SvcDesc = "Raspberry Pi 4 USB XHCI Filter Driver Service"
