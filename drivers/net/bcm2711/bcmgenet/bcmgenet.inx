@@ -1,0 +1,80 @@
+[Version]
+Signature               = "$Windows NT$"
+Class                   = Net
+ClassGUID               = {4d36e972-e325-11ce-bfc1-08002be10318}
+Provider                = %ProviderString%
+CatalogFile             = bcmgenet.cat
+PnpLockdown             = 1
+
+[ControlFlags]
+ExcludeFromSelect       = ACPI\BCM6E4E
+
+[SourceDisksNames]
+1                       = %DiskDescription%
+
+[SourceDisksFiles]
+bcmgenet.sys            = 1
+
+[DestinationDirs]
+DefaultDestDir          = 13
+
+[Manufacturer]
+%BCM%                   = BCM, NT$ARCH$.10.0...19041
+
+[BCM.NT$ARCH$.10.0...19041]
+%BCMGENET.DeviceDesc%   = BCMGENET, ACPI\BCM6E4E
+
+[BCMGENET.NT]
+FeatureScore            = 0xFE
+Characteristics         = 0x84  ; NCF_HAS_UI | NCF_PHYSICAL
+BusType                 = 15    ; PNPBus
+*IfType                 = 6     ; IF_TYPE_ETHERNET_CSMACD
+*MediaType              = 0     ; NdisMedium802_3
+*PhysicalMediaType      = 14    ; NdisPhysicalMedium802_3
+*IfConnectorPresent     = 1
+*ConnectionType         = 1     ; NET_IF_CONNECTION_DEDICATED
+*DirectionType          = 0     ; NET_IF_DIRECTION_SENDRECEIVE
+*AccessType             = 2     ; NET_IF_ACCESS_BROADCAST
+*HardwareLoopback       = 0
+CopyFiles               = BCMGENET.Copy
+AddReg                  = BCMGENET.Ndi.AddReg
+AddReg                  = NetworkAddress.Kw.AddReg
+
+[BCMGENET.NT.Services]
+AddService              = %BCMGENET.SvcName%, 2, BCMGENET.AddService
+
+[BCMGENET.Copy]
+bcmgenet.sys
+
+[BCMGENET.Ndi.AddReg]
+HKR, Ndi, Service, 0, %BCMGENET.SvcName%
+HKR, Ndi\Interfaces, UpperRange, 0, "ndis5"
+HKR, Ndi\Interfaces, LowerRange, 0, "ethernet"
+
+[BCMGENET.AddService]
+DisplayName             = %BCMGENET.SvcDesc%
+ServiceType             = 1     ; SERVICE_KERNEL_DRIVER
+StartType               = 3     ; SERVICE_DEMAND_START
+ErrorControl            = 1     ; SERVICE_ERROR_NORMAL
+ServiceBinary           = %13%\bcmgenet.sys
+AddReg                  = BCMGENET.Service.AddReg
+
+[BCMGENET.Service.AddReg]
+HKR, , BootFlags, 0x10001, 1
+
+[NetworkAddress.Kw.AddReg]
+HKR,Ndi\params\NetworkAddress, ParamDesc, 0, %NetworkAddress%
+HKR,Ndi\params\NetworkAddress, type,      0, "edit"
+HKR,Ndi\params\NetworkAddress, default,   0, ""
+HKR,Ndi\params\NetworkAddress, LimitText, 0, "12"
+HKR,Ndi\params\NetworkAddress, UpperCase, 0, "1"
+HKR,Ndi\params\NetworkAddress, Optional,  0, "1"
+
+[Strings]
+ProviderString          = "Open Source"
+DiskDescription         = "Broadcom GENET Driver Disk 1"
+BCM                     = "Broadcom"
+BCMGENET.DeviceDesc     = "Broadcom GENET Gigabit Ethernet Controller"
+BCMGENET.SvcName        = "bcmgenet"
+BCMGENET.SvcDesc        = "Broadcom GENET Driver Service"
+NetworkAddress          = "Network Address"
