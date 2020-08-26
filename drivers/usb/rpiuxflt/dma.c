@@ -4,19 +4,32 @@
 #define SCATTER_GATHER_LIST_MIN_SIZE (sizeof(SCATTER_GATHER_LIST) + sizeof(SCATTER_GATHER_ELEMENT))
 #define FILTER_ADAPTER_MAX_PAGES 128
 #define FILTER_SCATTER_GATHER_MAX_SIZE (FILTER_ADAPTER_MAX_PAGES * PAGE_SIZE)
+#define FILTER_NUM_BOUNCE_BUFFERS 32
 #define FILTER_MAX_DMA_PHYSICAL_ADDRESS 0xbfffffff
+
+typedef struct _SCATTER_GATHER_HEADER
+{
+    ULONG NumberOfElements;
+    ULONG_PTR Reserved;
+} SCATTER_GATHER_HEADER, *PSCATTER_GATHER_HEADER;
+
+typedef struct _FILTER_BOUNCE_BUFFER
+{
+    PVOID VirtualAddress;
+    PMDL Mdl;
+    SCATTER_GATHER_HEADER ScatterGatherHeader;
+    SCATTER_GATHER_ELEMENT ScatterGatherElement;
+} FILTER_BOUNCE_BUFFER, *PFILTER_BOUNCE_BUFFER;
 
 typedef struct _FILTER_DMA_ADAPTER
 {
     DMA_ADAPTER Adapter;
     PDMA_ADAPTER AttachedAdapter;
-    KEVENT BounceBufferAvailableEvent;
-    PVOID BounceBufferVa;
-    PMDL Mdl;
-    SCATTER_GATHER_LIST ScatterGather;
+    KSPIN_LOCK BounceBufferLock;
+    FILTER_BOUNCE_BUFFER BounceBuffers[FILTER_NUM_BOUNCE_BUFFERS];
+    PFILTER_BOUNCE_BUFFER FreeBounceBuffers[FILTER_NUM_BOUNCE_BUFFERS];
+    ULONG CurrentFreeBounceBuffer;
 } FILTER_DMA_ADAPTER, *PFILTER_DMA_ADAPTER;
-
-#define FILTER_DMA_ADAPTER_SIZE (sizeof(FILTER_DMA_ADAPTER) + sizeof(SCATTER_GATHER_ELEMENT))
 
 static
 PVOID
@@ -140,9 +153,9 @@ Dma_GetScatterGatherList(
     IN BOOLEAN WriteToDevice
     )
 {
-    NTSTATUS status;
-    LARGE_INTEGER timeout = {0};
     PFILTER_DMA_ADAPTER pFilterAdapter = (PFILTER_DMA_ADAPTER)DmaAdapter;
+    KIRQL savedIrql;
+    PFILTER_BOUNCE_BUFFER pBounceBuffer = NULL;
     PVOID systemCurrentVa;
 
     UNREFERENCED_PARAMETER(CurrentVa);
@@ -159,29 +172,30 @@ Dma_GetScatterGatherList(
         return STATUS_BUFFER_OVERFLOW;
     }
 
-    status = KeWaitForSingleObject(
-        &pFilterAdapter->BounceBufferAvailableEvent,
-        Executive,
-        KernelMode,
-        FALSE,
-        &timeout);
+    KeAcquireSpinLock(&pFilterAdapter->BounceBufferLock, &savedIrql);
+    if (pFilterAdapter->CurrentFreeBounceBuffer) {
+        pBounceBuffer =
+            pFilterAdapter
+            ->FreeBounceBuffers[--pFilterAdapter->CurrentFreeBounceBuffer];
+    }
+    KeReleaseSpinLock(&pFilterAdapter->BounceBufferLock, savedIrql);
 
-    if (STATUS_SUCCESS != status) {
+    if (pBounceBuffer == NULL) {
         return STATUS_UNSUCCESSFUL;
     }
 
     if (WriteToDevice) {
         systemCurrentVa = MmGetSystemAddressForMdlSafe(Mdl, NormalPagePriority);
-        RtlCopyMemory(pFilterAdapter->BounceBufferVa, systemCurrentVa, Length);
+        RtlCopyMemory(pBounceBuffer->VirtualAddress, systemCurrentVa, Length);
     }
 
-    pFilterAdapter->Mdl = Mdl;
-    pFilterAdapter->ScatterGather.Elements[0].Length = Length;
+    pBounceBuffer->Mdl = Mdl;
+    pBounceBuffer->ScatterGatherElement.Length = Length;
 
     ExecutionRoutine(
         DeviceObject,
         NULL,
-        &pFilterAdapter->ScatterGather,
+        (PSCATTER_GATHER_LIST)&pBounceBuffer->ScatterGatherHeader,
         Context);
 
     return STATUS_SUCCESS;
@@ -196,22 +210,24 @@ Dma_PutScatterGatherList(
     )
 {
     PFILTER_DMA_ADAPTER pFilterAdapter = (PFILTER_DMA_ADAPTER)DmaAdapter;
+    PFILTER_BOUNCE_BUFFER pBounceBuffer = CONTAINING_RECORD(ScatterGather,
+                                                            FILTER_BOUNCE_BUFFER,
+                                                            ScatterGatherHeader);
     PVOID systemCurrentVa;
-
-    UNREFERENCED_PARAMETER(ScatterGather);
-
-    ASSERT(&pFilterAdapter->ScatterGather == ScatterGather);
+    KIRQL savedIrql;
 
     if (!WriteToDevice) {
-        systemCurrentVa = MmGetSystemAddressForMdlSafe(pFilterAdapter->Mdl, NormalPagePriority);
-        RtlCopyMemory(systemCurrentVa, pFilterAdapter->BounceBufferVa,
-                      pFilterAdapter->ScatterGather.Elements[0].Length);
+        systemCurrentVa = MmGetSystemAddressForMdlSafe(pBounceBuffer->Mdl, NormalPagePriority);
+        RtlCopyMemory(systemCurrentVa, pBounceBuffer->VirtualAddress,
+                      pBounceBuffer->ScatterGatherElement.Length);
     }
 
-    KeSetEvent(
-        &pFilterAdapter->BounceBufferAvailableEvent,
-        IO_NO_INCREMENT,
-        FALSE);
+    NT_FRE_ASSERT(pFilterAdapter->CurrentFreeBounceBuffer <
+                  FILTER_NUM_BOUNCE_BUFFERS);
+    KeAcquireSpinLock(&pFilterAdapter->BounceBufferLock, &savedIrql);
+    pFilterAdapter->FreeBounceBuffers[pFilterAdapter->CurrentFreeBounceBuffer++] =
+        pBounceBuffer;
+    KeReleaseSpinLock(&pFilterAdapter->BounceBufferLock, savedIrql);
 }
 
 static
@@ -221,14 +237,24 @@ Dma_PutDmaAdapter(
     )
 {
     PFILTER_DMA_ADAPTER pFilterAdapter = (PFILTER_DMA_ADAPTER)DmaAdapter;
+    ULONG bounceBufferIndex;
+    PFILTER_BOUNCE_BUFFER pBounceBuffer;
 
-    if (NULL != pFilterAdapter->BounceBufferVa) {
-        Dma_FreeCommonBuffer(
-            DmaAdapter,
-            FILTER_SCATTER_GATHER_MAX_SIZE,
-            pFilterAdapter->ScatterGather.Elements[0].Address,
-            pFilterAdapter->BounceBufferVa,
-            FALSE);
+    NT_FRE_ASSERT(pFilterAdapter->CurrentFreeBounceBuffer ==
+                  FILTER_NUM_BOUNCE_BUFFERS);
+
+    for (bounceBufferIndex = 0; bounceBufferIndex < FILTER_NUM_BOUNCE_BUFFERS;
+         ++bounceBufferIndex) {
+        pBounceBuffer = &pFilterAdapter->BounceBuffers[bounceBufferIndex];
+
+        if (NULL != pBounceBuffer->VirtualAddress) {
+            Dma_FreeCommonBuffer(
+                DmaAdapter,
+                FILTER_SCATTER_GATHER_MAX_SIZE,
+                pBounceBuffer->ScatterGatherElement.Address,
+                pBounceBuffer->VirtualAddress,
+                FALSE);
+        }
     }
 
     if (NULL != pFilterAdapter->AttachedAdapter) {
@@ -255,7 +281,7 @@ Dma_AllocateAdapterChannel(
     UNREFERENCED_PARAMETER(ExecutionRoutine);
     UNREFERENCED_PARAMETER(Context);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -278,7 +304,7 @@ Dma_FlushAdapterBuffers(
     UNREFERENCED_PARAMETER(Length);
     UNREFERENCED_PARAMETER(WriteToDevice);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return FALSE;
 }
@@ -291,7 +317,7 @@ Dma_FreeAdapterChannel(
 {
     UNREFERENCED_PARAMETER(DmaAdapter);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 }
 
 static
@@ -306,7 +332,7 @@ Dma_FreeMapRegisters(
     UNREFERENCED_PARAMETER(MapRegisterBase);
     UNREFERENCED_PARAMETER(NumberOfMapRegisters);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 }
 
 static
@@ -329,7 +355,7 @@ Dma_MapTransfer(
     UNREFERENCED_PARAMETER(Length);
     UNREFERENCED_PARAMETER(WriteToDevice);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return result;
 }
@@ -371,7 +397,7 @@ Dma_BuildScatterGatherList(
     UNREFERENCED_PARAMETER(ScatterGatherBuffer);
     UNREFERENCED_PARAMETER(ScatterGatherLength);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -390,7 +416,7 @@ Dma_BuildMdlFromScatterGatherList(
     UNREFERENCED_PARAMETER(OriginalMdl);
     UNREFERENCED_PARAMETER(TargetMdl);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -405,7 +431,7 @@ Dma_GetDmaAdapterInfo(
     UNREFERENCED_PARAMETER(DmaAdapter);
     UNREFERENCED_PARAMETER(AdapterInfo);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -420,7 +446,7 @@ Dma_InitializeDmaTransferContext(
     UNREFERENCED_PARAMETER(DmaAdapter);
     UNREFERENCED_PARAMETER(DmaTransferContext);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -443,7 +469,7 @@ Dma_AllocateCommonBufferEx(
     UNREFERENCED_PARAMETER(CacheEnabled);
     UNREFERENCED_PARAMETER(PreferredNode);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return NULL;
 }
@@ -470,7 +496,7 @@ Dma_AllocateAdapterChannelEx(
     UNREFERENCED_PARAMETER(ExecutionContext);
     UNREFERENCED_PARAMETER(MapRegisterBase);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -487,7 +513,7 @@ Dma_ConfigureAdapterChannel(
     UNREFERENCED_PARAMETER(FunctionNumber);
     UNREFERENCED_PARAMETER(Context);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -504,7 +530,7 @@ Dma_CancelAdapterChannel(
     UNREFERENCED_PARAMETER(DeviceObject);
     UNREFERENCED_PARAMETER(DmaTransferContext);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return FALSE;
 }
@@ -537,7 +563,7 @@ Dma_MapTransferEx(
     UNREFERENCED_PARAMETER(DmaCompletionRoutine);
     UNREFERENCED_PARAMETER(CompletionContext);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -574,7 +600,7 @@ Dma_GetScatterGatherListEx(
     UNREFERENCED_PARAMETER(CompletionContext);
     UNREFERENCED_PARAMETER(ScatterGatherList);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -615,7 +641,7 @@ Dma_BuildScatterGatherListEx(
     UNREFERENCED_PARAMETER(CompletionContext);
     UNREFERENCED_PARAMETER(ScatterGatherList);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -638,7 +664,7 @@ Dma_FlushAdapterBuffersEx(
     UNREFERENCED_PARAMETER(Length);
     UNREFERENCED_PARAMETER(WriteToDevice);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -653,7 +679,7 @@ Dma_FreeAdapterObject(
     UNREFERENCED_PARAMETER(DmaAdapter);
     UNREFERENCED_PARAMETER(AllocationAction);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 }
 
 static
@@ -666,7 +692,7 @@ Dma_CancelMappedTransfer(
     UNREFERENCED_PARAMETER(DmaAdapter);
     UNREFERENCED_PARAMETER(DmaTransferContext);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -695,7 +721,7 @@ Dma_AllocateDomainCommonBuffer(
     UNREFERENCED_PARAMETER(LogicalAddress);
     UNREFERENCED_PARAMETER(VirtualAddress);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -712,7 +738,7 @@ Dma_FlushDmaBuffer(
     UNREFERENCED_PARAMETER(Mdl);
     UNREFERENCED_PARAMETER(ReadOperation);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -727,7 +753,7 @@ Dma_JoinDmaDomain(
     UNREFERENCED_PARAMETER(DmaAdapter);
     UNREFERENCED_PARAMETER(DomainHandle);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -740,7 +766,7 @@ Dma_LeaveDmaDomain(
 {
     UNREFERENCED_PARAMETER(DmaAdapter);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -753,7 +779,7 @@ Dma_GetDmaDomain(
 {
     UNREFERENCED_PARAMETER(DmaAdapter);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return NULL;
 }
@@ -780,7 +806,7 @@ Dma_AllocateCommonBufferWithBounds(
     UNREFERENCED_PARAMETER(PreferredNode);
     UNREFERENCED_PARAMETER(LogicalAddress);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return NULL;
 }
@@ -809,7 +835,7 @@ Dma_AllocateCommonBufferVector(
     UNREFERENCED_PARAMETER(SizeOfElements);
     UNREFERENCED_PARAMETER(VectorOut);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 
     return STATUS_NOT_IMPLEMENTED;
 }
@@ -830,7 +856,7 @@ Dma_GetCommonBufferFromVectorByIndex(
     UNREFERENCED_PARAMETER(VirtualAddressOut);
     UNREFERENCED_PARAMETER(LogicalAddressOut);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 }
 
 static
@@ -845,7 +871,7 @@ Dma_FreeCommonBufferFromVector(
     UNREFERENCED_PARAMETER(Vector);
     UNREFERENCED_PARAMETER(Index);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 }
 
 static
@@ -858,7 +884,7 @@ Dma_FreeCommonBufferVector(
     UNREFERENCED_PARAMETER(DmaAdapter);
     UNREFERENCED_PARAMETER(Vector);
 
-    ASSERT(FALSE);
+    NT_FRE_ASSERT(FALSE);
 }
 
 static
@@ -914,16 +940,18 @@ Dma_CreateDmaAdapter(
 {
     PFILTER_DMA_ADAPTER pFilterAdapter;
     PDMA_ADAPTER pAttachedAdapter;
-    PHYSICAL_ADDRESS bounceBufferLa = {0};
-    PVOID bounceBufferVa;
+    ULONG bounceBufferIndex;
+    PFILTER_BOUNCE_BUFFER pBounceBuffer;
 
     pFilterAdapter = ExAllocatePoolWithTag(NonPagedPoolNx,
-                                           FILTER_DMA_ADAPTER_SIZE,
+                                           sizeof(FILTER_DMA_ADAPTER),
                                            FILTER_ADAPTER_POOL_TAG);
 
     if (NULL == pFilterAdapter) {
         return NULL;
     }
+
+    RtlZeroMemory(pFilterAdapter, sizeof(FILTER_DMA_ADAPTER));
 
     pAttachedAdapter = DeviceData->AttachedBusInterface.GetDmaAdapter(
         DeviceData->AttachedBusInterface.Context,
@@ -938,29 +966,32 @@ Dma_CreateDmaAdapter(
     *NumberOfMapRegisters = FILTER_ADAPTER_MAX_PAGES + 2;
 
     pFilterAdapter->Adapter.Version = 1;
-    pFilterAdapter->Adapter.Size = FILTER_DMA_ADAPTER_SIZE;
+    pFilterAdapter->Adapter.Size = sizeof(FILTER_DMA_ADAPTER);
     pFilterAdapter->Adapter.DmaOperations = &Dma_DmaOperations;
     pFilterAdapter->AttachedAdapter = pAttachedAdapter;
 
-    bounceBufferVa = Dma_AllocateCommonBuffer(
-        (PDMA_ADAPTER)pFilterAdapter,
-        FILTER_SCATTER_GATHER_MAX_SIZE,
-        &bounceBufferLa,
-        FALSE);
+    KeInitializeSpinLock(&pFilterAdapter->BounceBufferLock);
 
-    if (NULL == bounceBufferVa) {
-        Dma_PutDmaAdapter((PDMA_ADAPTER)pFilterAdapter);
-        return NULL;
+    for (bounceBufferIndex = 0; bounceBufferIndex < FILTER_NUM_BOUNCE_BUFFERS;
+         ++bounceBufferIndex) {
+        pBounceBuffer = &pFilterAdapter->BounceBuffers[bounceBufferIndex];
+        pBounceBuffer->ScatterGatherHeader.NumberOfElements = 1;
+
+        pBounceBuffer->VirtualAddress = Dma_AllocateCommonBuffer(
+            (PDMA_ADAPTER)pFilterAdapter,
+            FILTER_SCATTER_GATHER_MAX_SIZE,
+            &pBounceBuffer->ScatterGatherElement.Address,
+            FALSE);
+
+        if (NULL == pBounceBuffer->VirtualAddress) {
+            Dma_PutDmaAdapter((PDMA_ADAPTER)pFilterAdapter);
+            return NULL;
+        }
+
+        pFilterAdapter->FreeBounceBuffers[bounceBufferIndex] = pBounceBuffer;
     }
 
-    KeInitializeEvent(
-        &pFilterAdapter->BounceBufferAvailableEvent,
-        SynchronizationEvent,
-        TRUE);
-
-    pFilterAdapter->BounceBufferVa = bounceBufferVa;
-    pFilterAdapter->ScatterGather.NumberOfElements = 1;
-    pFilterAdapter->ScatterGather.Elements[0].Address = bounceBufferLa;
+    pFilterAdapter->CurrentFreeBounceBuffer = FILTER_NUM_BOUNCE_BUFFERS;
 
     return (PDMA_ADAPTER)pFilterAdapter;
 }
