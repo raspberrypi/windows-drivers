@@ -121,7 +121,7 @@ NTSTATUS RpiSetDeviceMacAddress (
 
     PAGED_CODE();
 
-    HighestAcceptableAddress.QuadPart = HEX_1_G;
+    HighestAcceptableAddress.QuadPart = HEX_1_G - 1;
 
     // Firmware expects mailbox request to be in contiguous memory
     macAddrProperty = MmAllocateContiguousNodeMemory(

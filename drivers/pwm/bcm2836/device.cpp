@@ -631,7 +631,7 @@ Return Value:
 
     default:
         status = STATUS_INVALID_DEVICE_REQUEST;
-        TraceEvents(TRACE_LEVEL_ERROR, TRACE_IOCTL, "Unexpected IO code in request. Request: 0x%08x, Code: 0x%08x", (ULONG)Request, IoControlCode);
+        TraceEvents(TRACE_LEVEL_ERROR, TRACE_IOCTL, "Unexpected IO code in request. Request: 0x%p, Code: 0x%08x", Request, IoControlCode);
         break;
     }
 

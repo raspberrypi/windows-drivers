@@ -154,7 +154,7 @@ VOID RpiqProcessChannel (
             status = RpiqMailboxProperty(
                 deviceContextPtr,
                 inputBufferPtr,
-                sizeInput,
+                (ULONG)sizeInput,
                 MAILBOX_CHANNEL_PROPERTY_ARM_VC,
                 Request);
             if(!NT_SUCCESS(status)) {

@@ -20,6 +20,7 @@
    </ItemDefinitionGroup>
    <PropertyGroup>
     <SignMode>Off</SignMode>
+    <EnableInf2cat>false</EnableInf2cat>
    </PropertyGroup>
    <ItemGroup />
 </Project>

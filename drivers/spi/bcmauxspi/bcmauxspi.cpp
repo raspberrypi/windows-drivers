@@ -868,7 +868,7 @@ VOID AUXSPI_DEVICE::EvtSpbIoOther (
 
         if (writeDescriptor.TransferLength != readDescriptor.TransferLength) {
             AUXSPI_LOG_ERROR(
-                "Write buffer length must be equal to read buffer length for full-duplex transfer. (readDescriptor.TransferLength = %d, writeDescriptor.TransferLength = %d)",
+                "Write buffer length must be equal to read buffer length for full-duplex transfer. (readDescriptor.TransferLength = %lld, writeDescriptor.TransferLength = %lld)",
                 readDescriptor.TransferLength,
                 writeDescriptor.TransferLength);
             SpbRequestComplete(SpbRequest, STATUS_INVALID_PARAMETER);

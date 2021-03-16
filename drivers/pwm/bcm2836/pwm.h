@@ -8,7 +8,7 @@ Abstract:
 
 --*/
 
-#pragma once;
+#pragma once
 
 typedef struct _DEVICE_CONTEXT DEVICE_CONTEXT, *PDEVICE_CONTEXT;
 

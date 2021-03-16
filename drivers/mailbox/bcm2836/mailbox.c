@@ -187,7 +187,7 @@ NTSTATUS RpiqMailboxProperty (
 
     PAGED_CODE();
     
-    highAddress.QuadPart = HEX_1_G;
+    highAddress.QuadPart = HEX_1_G - 1;
 
     if (DataInPtr == NULL ||
         DataSize < sizeof(MAILBOX_HEADER)) {

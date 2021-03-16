@@ -385,9 +385,9 @@ private: // NONPAGED
     {
         UNREFERENCED_PARAMETER(BufferPtr);
         UNREFERENCED_PARAMETER(Length);
-        NT_ASSERT((reinterpret_cast<ULONG>(BufferPtr) &
+        NT_ASSERT((reinterpret_cast<UINT_PTR>(BufferPtr) &
                 FILE_LONG_ALIGNMENT) == 0);
-        NT_ASSERT((Length % sizeof(ULONG)) == 0);
+        NT_ASSERT((Length % sizeof(UINT_PTR)) == 0);
     }
 
     volatile BCM_AUXSPI_REGISTERS* registersPtr;

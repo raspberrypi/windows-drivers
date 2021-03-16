@@ -8,7 +8,7 @@ Abstract:
 
 --*/
 
-#pragma once;
+#pragma once
 
 #define PREVIOUS_PACKET_INDEX(currentPacket, numPackets) (currentPacket ? currentPacket - 1 : numPackets - 1)
 #define FIRST_CB_ADDRESS_OF_PACKET(packet, cbBaseAddressPaLow) (cbBaseAddressPaLow + (2 * packet * sizeof(DMA_CB)))

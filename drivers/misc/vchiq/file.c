@@ -68,8 +68,8 @@ NTSTATUS VchiqAllocateFileObjContext (
     }
 
     for (i = ARM_PORT_START; i < MAX_ARM_PORTS; i++) {
-        if (InterlockedCompareExchange((LONG*)&DeviceContextPtr->ArmPortHandles[i],
-            (LONG)*VchiqFileContextPPtr,
+        if (InterlockedCompareExchangePointer((PVOID*)&DeviceContextPtr->ArmPortHandles[i],
+            (PVOID)*VchiqFileContextPPtr,
             0) == 0) {
             // found a unused port number;
             (*VchiqFileContextPPtr)->ArmPortNumber = i;
@@ -249,9 +249,9 @@ VOID VchiqFileClose (
 
     // Release the port number
     portNumber = vchiqFileContextPtr->ArmPortNumber;
-    LONG temp = (LONG)deviceContextPtr->ArmPortHandles[portNumber];
-    if (InterlockedCompareExchange(
-        (LONG*)&deviceContextPtr->ArmPortHandles[portNumber],
+	PVOID temp = deviceContextPtr->ArmPortHandles[portNumber];
+    if (InterlockedCompareExchangePointer(
+        (PVOID*)&deviceContextPtr->ArmPortHandles[portNumber],
         0,
         temp)
         != temp) {

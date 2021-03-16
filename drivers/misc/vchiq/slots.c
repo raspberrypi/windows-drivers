@@ -75,7 +75,7 @@ NTSTATUS VchiqInit (
 
     // Initialize slot
     ULONG memAlign =
-        (VCHIQ_SLOT_SIZE - (ULONG)DeviceContextPtr->SlotZeroPtr)
+        (VCHIQ_SLOT_SIZE - (UINT_PTR)DeviceContextPtr->SlotZeroPtr)
         & VCHIQ_SLOT_MASK;
     VCHIQ_SLOT_ZERO* slotZeroPtr = (VCHIQ_SLOT_ZERO*)
         ((UCHAR*)DeviceContextPtr->SlotZeroPtr + memAlign);
@@ -1797,7 +1797,7 @@ NTSTATUS VchiqAddPendingMsg (
     newPendingMsgPtr = WdfMemoryGetBuffer(wdfMemoryNewPendingMsg, &bufferSize);
     if (!NT_SUCCESS(status) || (bufferSize != sizeof(*newPendingMsgPtr))) {
         VCHIQ_LOG_ERROR(
-            "WdfMemoryGetBuffer failed %!STATUS! size %d)",
+            "WdfMemoryGetBuffer failed %!STATUS! size %lld)",
             status,
             bufferSize);
         goto End;
@@ -1886,7 +1886,7 @@ NTSTATUS VchiqRemovePendingMsg (
     if (!NT_SUCCESS(status)) {
         VCHIQ_LOG_ERROR(
             "WdfRequestRetrieveOutputBuffer failed %!STATUS! \
-            bufSize(%d)",
+            bufSize(%lld)",
             status,
             bufSize);
         goto CompleteRequest;
@@ -1901,7 +1901,7 @@ NTSTATUS VchiqRemovePendingMsg (
     if (!NT_SUCCESS(status)) {
         VCHIQ_LOG_ERROR(
             "WdfRequestRetrieveInputBuffer failed %!STATUS! \
-            bufSize(%d)",
+            bufSize(%lld)",
             status,
             bufSize);
         goto CompleteRequest;
@@ -2176,7 +2176,7 @@ NTSTATUS VchiqAddPendingBulkMsg (
         WdfMemoryGetBuffer(wdfMemoryNewPendingMsg, &bufferSize);
     if (!NT_SUCCESS(status) || (bufferSize != sizeof(*newPendingBulkTransferPtr))) {
         VCHIQ_LOG_ERROR(
-            "WdfMemoryGetBuffer failed %!STATUS! size %d)",
+            "WdfMemoryGetBuffer failed %!STATUS! size %lld)",
             status,
             bufferSize);
         goto End;
@@ -2339,7 +2339,7 @@ NTSTATUS VchiqAddPendingVchiMsg (
     newPendingMsgPtr = WdfMemoryGetBuffer(wdfMemoryNewPendingMsg, &bufferSize);
     if (!NT_SUCCESS(status) || (bufferSize != sizeof(*newPendingMsgPtr))) {
         VCHIQ_LOG_ERROR(
-            "WdfMemoryGetBuffer failed %!STATUS! size %d)",
+            "WdfMemoryGetBuffer failed %!STATUS! size %lld)",
             status,
             bufferSize);
         goto End;
@@ -2428,7 +2428,7 @@ NTSTATUS VchiqRemovePendingVchiMsg (
     if (!NT_SUCCESS(status)) {
         VCHIQ_LOG_ERROR(
             "WdfRequestRetrieveInputBuffer failed %!STATUS! \
-            bufSize(%d)",
+            bufSize(%lld)",
             status,
             bufSize);
         goto CompleteRequest;
@@ -2443,7 +2443,7 @@ NTSTATUS VchiqRemovePendingVchiMsg (
     if (!NT_SUCCESS(status)) {
         VCHIQ_LOG_ERROR(
             "WdfRequestRetrieveOutputBuffer failed %!STATUS! \
-            bufSize(%d)",
+            bufSize(%lld)",
             status,
             bufSize);
         goto CompleteRequest;

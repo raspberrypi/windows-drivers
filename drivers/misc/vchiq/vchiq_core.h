@@ -90,7 +90,7 @@ typedef struct _VCHIQ_REMOTE_EVENT {
     ULONG Fired;
 
     // This is unused for now
-    ULONG* Semaphore;
+    ULONG Semaphore;
 } VCHIQ_REMOTE_EVENT;
 
 typedef struct _VCHIQ_SLOT {

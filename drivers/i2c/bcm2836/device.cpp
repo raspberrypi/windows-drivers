@@ -219,7 +219,7 @@ ULONG ReadFifo (
             READ_REGISTER_NOFENCE_ULONG(&RegistersPtr->DataFIFO));
     }
 
-    ULONG bytesRead = dataPtr - BufferPtr;
+    ULONG bytesRead = (ULONG)(dataPtr - BufferPtr);
     BSC_LOG_TRACE(
         "Read %d of %d bytes from RX FIFO",
         bytesRead,
@@ -269,7 +269,7 @@ ULONG WriteFifo (
         WRITE_REGISTER_NOFENCE_ULONG(&RegistersPtr->DataFIFO, *dataPtr++);
     }
 
-    ULONG bytesWritten = dataPtr - BufferPtr;
+    ULONG bytesWritten = (ULONG)(dataPtr - BufferPtr);
     BSC_LOG_TRACE(
         "Wrote %d of %d bytes to TX FIFO",
         bytesWritten,
@@ -313,7 +313,7 @@ VOID OnRead (
         NT_ASSERT(outputBufferLength == Length);
         if (outputBufferLength > BCM_I2C_MAX_TRANSFER_LENGTH) {
             BSC_LOG_ERROR(
-                "Output buffer is too large for DataLength register. (SpbRequest = %p, outputBufferLength = %lu, BCM_I2C_MAX_TRANSFER_LENGTH = %lu)",
+                "Output buffer is too large for DataLength register. (SpbRequest = %p, outputBufferLength = %llu, BCM_I2C_MAX_TRANSFER_LENGTH = %lu)",
                 SpbRequest,
                 outputBufferLength,
                 BCM_I2C_MAX_TRANSFER_LENGTH);
@@ -420,7 +420,7 @@ VOID OnWrite (
         NT_ASSERT(inputBufferLength == Length);
         if (inputBufferLength > BCM_I2C_MAX_TRANSFER_LENGTH) {
             BSC_LOG_ERROR(
-                "Write buffer is too large. (SpbRequest = %p, inputBufferLength = %lu, BCM_I2C_MAX_TRANSFER_LENGTH = %lu)",
+                "Write buffer is too large. (SpbRequest = %p, inputBufferLength = %llu, BCM_I2C_MAX_TRANSFER_LENGTH = %llu)",
                 SpbRequest,
                 inputBufferLength,
                 BCM_I2C_MAX_TRANSFER_LENGTH);
@@ -678,7 +678,7 @@ VOID OnSequence (
 
         if (writeDescriptor.TransferLength > BCM_I2C_MAX_TRANSFER_LENGTH) {
             BSC_LOG_ERROR(
-                "Write buffer is too large. (SpbRequest = %p, writeDescriptor.TransferLength = %lu, BCM_I2C_MAX_TRANSFER_LENGTH = %lu)",
+                "Write buffer is too large. (SpbRequest = %p, writeDescriptor.TransferLength = %llu, BCM_I2C_MAX_TRANSFER_LENGTH = %llu)",
                 SpbRequest,
                 writeDescriptor.TransferLength,
                 BCM_I2C_MAX_TRANSFER_LENGTH);
@@ -711,7 +711,7 @@ VOID OnSequence (
 
         if (readDescriptor.TransferLength > BCM_I2C_MAX_TRANSFER_LENGTH) {
             BSC_LOG_ERROR(
-                "Read buffer is too large for DataLength register. (SpbRequest = %p, readDescriptor.TransferLength= %lu, BCM_I2C_MAX_TRANSFER_LENGTH = %lu)",
+                "Read buffer is too large for DataLength register. (SpbRequest = %p, readDescriptor.TransferLength= %llu, BCM_I2C_MAX_TRANSFER_LENGTH = %llu)",
                 SpbRequest,
                 readDescriptor.TransferLength,
                 BCM_I2C_MAX_TRANSFER_LENGTH);
@@ -1347,9 +1347,9 @@ NTSTATUS ProcessRequestCompletion (
         if (transferState == TRANSFER_STATE::SENDING_SEQUENCE) {
             bytesToWrite = InterruptContextPtr->SequenceContext.BytesToWrite;
         } else {
-            bytesToWrite =
+            bytesToWrite = (ULONG)(
                 InterruptContextPtr->WriteContext.EndPtr -
-                InterruptContextPtr->WriteContext.WriteBufferPtr;
+                InterruptContextPtr->WriteContext.WriteBufferPtr);
         }
 
         if (InterruptContextPtr->CapturedDataLength > bytesToWrite) {
@@ -1430,8 +1430,8 @@ NTSTATUS ProcessRequestCompletion (
             "If none of the error bits were set, all bytes should have been received",
             readContextPtr->CurrentReadBufferPtr == readContextPtr->EndPtr);
 
-        *RequestInformationPtr = readContextPtr->CurrentReadBufferPtr -
-            readContextPtr->ReadBufferPtr;
+        *RequestInformationPtr = (ULONG)(readContextPtr->CurrentReadBufferPtr -
+            readContextPtr->ReadBufferPtr);
         return STATUS_SUCCESS;
     }
     case TRANSFER_STATE::RECEIVING_SEQUENCE:

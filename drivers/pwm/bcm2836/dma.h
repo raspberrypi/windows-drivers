@@ -8,7 +8,7 @@ Abstract:
 
 --*/
 
-#pragma once;
+#pragma once
 
 //
 // Full DMA buffer size. The buffer holds as much audio packets as possible.

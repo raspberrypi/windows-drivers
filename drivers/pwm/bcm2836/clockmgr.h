@@ -8,7 +8,7 @@ This file contains definitions for the BCM2836 clock manager.
 
 --*/
 
-#pragma once;
+#pragma once
 
 #define CM_APB_CLK_FREQ             250000000L  // 250Mhz core clock
 

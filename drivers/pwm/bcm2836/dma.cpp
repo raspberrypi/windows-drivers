@@ -386,8 +386,8 @@ Return Value:
 
                 ULONG ti = DMA_TI_SRC_INC | DMA_TI_SRC_DREQ | (deviceContext->dmaDreq << DMA_TI_PERMAP_SHIFT) | DMA_TI_BURST_LENGTH_0;
 
-                TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_INIT, "Build CBs for %d audio packets. CBs @ 0x%08x (phys: 0x%08x) Packet size: %d, First chunk size: %d",
-                    deviceContext->dmaNumPackets, (ULONG)deviceContext->dmaCb, deviceContext->dmaCbPa.LowPart, packetSize, packetFirstChunkSize
+                TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_INIT, "Build CBs for %d audio packets. CBs @ 0x%p (phys: 0x%08x) Packet size: %d, First chunk size: %d",
+                    deviceContext->dmaNumPackets, deviceContext->dmaCb, deviceContext->dmaCbPa.LowPart, packetSize, packetFirstChunkSize
                     );
 
                 for (currentCb = deviceContext->dmaCb, packetIndex = 0; packetIndex < deviceContext->dmaNumPackets; packetIndex++, currentCb++)
@@ -416,8 +416,8 @@ Return Value:
                     currentCb->STRIDE = 0;
                     nextCbPa = MmGetPhysicalAddress(currentCb + 1);
                     currentCb->NEXTCONBK = nextCbPa.LowPart + deviceContext->memUncachedOffset;
-                    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_INIT, "First CB packet %d @ 0x%08x (phys: 0x%08x) - NEXTCONBK: 0x%08x, TI: 0x%08x, SOURCE_AD: 0x%08x, DEST_AD: 0x%08x, TXFR_LEN: 0x%08x (%d)",
-                        packetIndex, (ULONG)currentCb, pa.LowPart, currentCb->NEXTCONBK, currentCb->TI, currentCb->SOURCE_AD, currentCb->DEST_AD, currentCb->TXFR_LEN, currentCb->TXFR_LEN
+                    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_INIT, "First CB packet %d @ 0x%p (phys: 0x%08x) - NEXTCONBK: 0x%08x, TI: 0x%08x, SOURCE_AD: 0x%08x, DEST_AD: 0x%08x, TXFR_LEN: 0x%08x (%d)",
+                        packetIndex, currentCb, pa.LowPart, currentCb->NEXTCONBK, currentCb->TI, currentCb->SOURCE_AD, currentCb->DEST_AD, currentCb->TXFR_LEN, currentCb->TXFR_LEN
                         );
                     currentCb++;
 
@@ -432,8 +432,8 @@ Return Value:
                     currentCb->TXFR_LEN = AUDIO_PACKET_LAST_CHUNK_SIZE;
                     currentCb->STRIDE = 0;
                     currentCb->NEXTCONBK = 0;
-                    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_INIT, "Second CB packet %d @ 0x%08x (phys: 0x%08x) - NEXTCONBK: 0x%08x, TI: 0x%08x, SOURCE_AD: 0x%08x, DEST_AD: 0x%08x, TXFR_LEN: 0x%08x (%d)",
-                        packetIndex, (ULONG)currentCb, pa.LowPart, currentCb->NEXTCONBK, currentCb->TI, currentCb->SOURCE_AD, currentCb->DEST_AD, currentCb->TXFR_LEN, currentCb->TXFR_LEN
+                    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_INIT, "Second CB packet %d @ 0x%p (phys: 0x%08x) - NEXTCONBK: 0x%08x, TI: 0x%08x, SOURCE_AD: 0x%08x, DEST_AD: 0x%08x, TXFR_LEN: 0x%08x (%d)",
+                        packetIndex, currentCb, pa.LowPart, currentCb->NEXTCONBK, currentCb->TI, currentCb->SOURCE_AD, currentCb->DEST_AD, currentCb->TXFR_LEN, currentCb->TXFR_LEN
                         );
 
                     //
@@ -444,7 +444,7 @@ Return Value:
                     // Finally we set all NEXTCONBK values in the packet list to 0.
                     //
 
-                    deviceContext->dmaPacketLinkInfo[packetIndex].LinkValue = (ULONG)((PCHAR)(deviceContext->dmaCbPa.LowPart) + packetIndex * 2 * sizeof(DMA_CB));;
+                    deviceContext->dmaPacketLinkInfo[packetIndex].LinkValue = (UINT_PTR)((PCHAR)(deviceContext->dmaCbPa.LowPart) + packetIndex * 2 * sizeof(DMA_CB));;
                     if (packetIndex == 0)
                     {
                         deviceContext->dmaPacketLinkInfo[packetIndex].LinkPtr = &(deviceContext->dmaCb[2 * (deviceContext->dmaNumPackets - 1) + 1].NEXTCONBK);;
@@ -546,7 +546,7 @@ Return Value:
                 currentNotificationListEntry = currentNotificationListEntry->Flink;
             }
         }
-        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_IO, "Notification event registered: 0x%08x, Current process: 0x%08x", (ULONG)*notificationEvent, (ULONG)IoGetCurrentProcess());
+        TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_IO, "Notification event registered: 0x%p, Current process: 0x%p", *notificationEvent, IoGetCurrentProcess());
         InsertTailList(&deviceContext->notificationList, &(notification->ListEntry));
 
         WdfSpinLockRelease(deviceContext->notificationListLock);
@@ -611,7 +611,7 @@ Status
                     nextNotificationListEntry = currentNotificationListEntry->Flink;
                     RemoveEntryList(currentNotificationListEntry);
                     ExFreePoolWithTag(currentNotfication, BCM_PWM_POOLTAG);
-                    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_IO, "Notification event unregistered: 0x%08x", (ULONG)*notificationEvent);
+                    TraceEvents(TRACE_LEVEL_INFORMATION, TRACE_IO, "Notification event unregistered: 0x%p", *notificationEvent);
                     currentNotificationListEntry = nextNotificationListEntry;
                 }
                 else

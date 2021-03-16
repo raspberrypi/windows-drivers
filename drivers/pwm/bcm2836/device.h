@@ -8,7 +8,7 @@ Abstract:
 
 --*/
 
-#pragma once;
+#pragma once
 
 #define NO_LAST_COMPLETED_PACKET    0xFFFFFFFF
 

@@ -24,16 +24,16 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Copyright © 2015 Microsoft Corporation
+Copyright Â© 2015 Microsoft Corporation
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the “Software”), to deal in
+this software and associated documentation files (the â€œSoftwareâ€), to deal in
 the Software without restriction, including without limitation the rights to
 use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
 of the Software, and to permit persons to whom the Software is furnished to do
 so, subject to the following conditions:
 
-THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+THE SOFTWARE IS PROVIDED â€œAS ISâ€, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
@@ -120,7 +120,7 @@ static void vcos_generic_blockpool_subpool_init(
     */
    subpool->start = (char *) subpool->mem + sizeof(VCOS_BLOCKPOOL_HEADER_T);
    subpool->start = (void*)
-      VCOS_BLOCKPOOL_ROUND_UP((unsigned long) subpool->start, align);
+      VCOS_BLOCKPOOL_ROUND_UP((UINT_PTR) subpool->start, align);
    subpool->start = (char *) subpool->start - sizeof(VCOS_BLOCKPOOL_HEADER_T);
 
    vcos_assert(subpool->start >= subpool->mem);

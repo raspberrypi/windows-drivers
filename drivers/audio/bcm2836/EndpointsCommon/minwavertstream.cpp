@@ -495,7 +495,7 @@ Return Value:
     ntStatus = PwmIoctlCall(IOCTL_BCM_PWM_REGISTER_AUDIO_NOTIFICATION, &NotificationEvent, sizeof(PKEVENT), NULL, 0);
     if (NT_SUCCESS(ntStatus))
     {
-        DPF(D_VERBOSE, ("[CMiniportWaveRTStream::RegisterNotificationEvent] Successfully registered notification event 0x%08x with PWM", (ULONG)NotificationEvent));
+        DPF(D_VERBOSE, ("[CMiniportWaveRTStream::RegisterNotificationEvent] Successfully registered notification event 0x%p with PWM", NotificationEvent));
     }
     else
     {
@@ -522,7 +522,7 @@ Return Value:
         }
         InsertTailList(&m_NotificationList, &(notification->ListEntry));
 
-        DPF(D_VERBOSE, ("[CMiniportWaveRTStream::RegisterNotificationEvent] Notification event registered: 0x%08x", (ULONG)NotificationEvent));
+        DPF(D_VERBOSE, ("[CMiniportWaveRTStream::RegisterNotificationEvent] Notification event registered: 0x%p", NotificationEvent));
     }
 
     return ntStatus;
@@ -559,7 +559,7 @@ Return Value:
     ntStatus = PwmIoctlCall(IOCTL_BCM_PWM_UNREGISTER_AUDIO_NOTIFICATION, &NotificationEvent, sizeof(PKEVENT), NULL, 0);
     if (NT_SUCCESS(ntStatus))
     {
-        DPF(D_VERBOSE, ("[CMiniportWaveRTStream::UnregisterNotificationEvent] Successfully unregistered notification event 0x%X", (ULONG)NotificationEvent));
+        DPF(D_VERBOSE, ("[CMiniportWaveRTStream::UnregisterNotificationEvent] Successfully unregistered notification event 0x%p", NotificationEvent));
     }
     else
     {
@@ -578,7 +578,7 @@ Return Value:
                 nextNotificationListEntry = currentNotificationListEntry->Flink;
                 RemoveEntryList(currentNotificationListEntry);
                 ExFreePoolWithTag(currentNotfication, MINWAVERT_POOLTAG);
-                DPF(D_VERBOSE, ("[CMiniportWaveRTStream::UnregisterNotificationEvent] Notification event (0x%08x) unregistered", (ULONG)NotificationEvent));
+                DPF(D_VERBOSE, ("[CMiniportWaveRTStream::UnregisterNotificationEvent] Notification event (0x%p) unregistered", NotificationEvent));
                 currentNotificationListEntry = nextNotificationListEntry;
             }
             else

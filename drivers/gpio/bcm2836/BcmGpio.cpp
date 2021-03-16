@@ -46,6 +46,9 @@ void __cdecl operator delete (
 void __cdecl operator delete (void*, unsigned int) throw ()
 {} // void operator delete (void*, unsigned int)
 
+void __cdecl operator delete (void*, unsigned __int64) throw ()
+{} // void operator delete (void*, unsigned __int64)
+
 namespace { // static
 
     typedef BCM_GPIO::_DPC_CONTEXT DPC_CONTEXT;
