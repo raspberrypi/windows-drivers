@@ -527,10 +527,10 @@ NTSTATUS RpiqSetNdisMacAddress()
                             );
 
         if ( status == STATUS_BUFFER_TOO_SMALL ) {
-            infoBuffer = ExAllocatePool(
+            infoBuffer = ExAllocatePoolZero(
                                 NonPagedPoolNx,
-                                RequireBufferLength
-                                );
+                                RequireBufferLength,
+                                RpiqTag);
 
             if ( infoBuffer == NULL ) {
                 goto End;

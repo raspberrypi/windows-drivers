@@ -13,6 +13,7 @@
 #pragma once
 
 #define INITGUID
+#define POOL_ZERO_DOWN_LEVEL_SUPPORT
 
 // Window related header files
 #include <ntddk.h>
