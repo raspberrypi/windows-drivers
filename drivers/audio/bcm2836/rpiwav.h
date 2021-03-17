@@ -18,6 +18,7 @@ Abstract:
 #include <MsApoFxProxy.h>
 #include <Ntstrsafe.h>
 #include <bcm2836pwm.h>
+#include "NewDelete.h"
 
 //=============================================================================
 // Defines
