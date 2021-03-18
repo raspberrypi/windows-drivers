@@ -54,7 +54,22 @@
     <UseDebugLibraries>False</UseDebugLibraries>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <Import Project="$(SolutionDir)\..\bsp.props" />
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+    <Import Project="$(SolutionDir)\..\bsp.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+    <Import Project="$(SolutionDir)\..\bsp.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+    <Import Project="$(SolutionDir)\..\bsp.props" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
+    <Import Project="$(SolutionDir)\..\bsp.props" />
+  </ImportGroup>
   <ItemGroup>
     <PkgGen Include="SerPL011.pkg.xml" />
   </ItemGroup>
@@ -62,9 +77,7 @@
     <ClCompile>
       <WarningVersion>18</WarningVersion>
       <DisableSpecificWarnings>4296;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <WppEnabled>true</WppEnabled>
       <WppKernelMode>true</WppKernelMode>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAddAlternateNameToMessageGUID>SerPL011</WppAddAlternateNameToMessageGUID>
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppScanConfigurationData>PL011logging.h</WppScanConfigurationData>
@@ -75,9 +88,7 @@
     <ClCompile>
       <WarningVersion>18</WarningVersion>
       <DisableSpecificWarnings>4296;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <WppEnabled>true</WppEnabled>
       <WppKernelMode>true</WppKernelMode>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAddAlternateNameToMessageGUID>SerPL011</WppAddAlternateNameToMessageGUID>
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppScanConfigurationData>PL011logging.h</WppScanConfigurationData>
@@ -88,9 +99,7 @@
     <ClCompile>
       <WarningVersion>18</WarningVersion>
       <DisableSpecificWarnings>4296;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <WppEnabled>true</WppEnabled>
       <WppKernelMode>true</WppKernelMode>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAddAlternateNameToMessageGUID>SerPL011</WppAddAlternateNameToMessageGUID>
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppScanConfigurationData>PL011logging.h</WppScanConfigurationData>
@@ -101,9 +110,7 @@
     <ClCompile>
       <WarningVersion>18</WarningVersion>
       <DisableSpecificWarnings>4296;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <WppEnabled>true</WppEnabled>
       <WppKernelMode>true</WppKernelMode>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppAddAlternateNameToMessageGUID>SerPL011</WppAddAlternateNameToMessageGUID>
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppScanConfigurationData>PL011logging.h</WppScanConfigurationData>
