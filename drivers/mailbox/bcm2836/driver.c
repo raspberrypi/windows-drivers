@@ -54,6 +54,8 @@ NTSTATUS DriverEntry(
     WDF_DRIVER_CONFIG config;
     WDF_OBJECT_ATTRIBUTES attributes;
 
+    ExInitializeDriverRuntime(0);
+
     // Initialize WPP Tracing
     {
         WPP_INIT_TRACING(DriverObject, RegistryPath);

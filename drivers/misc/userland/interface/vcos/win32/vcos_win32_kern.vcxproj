@@ -29,7 +29,6 @@
   <PropertyGroup Label="PropertySheets">
     <ConversionToolVersion>1.0</ConversionToolVersion>
     <BUILD_ALT_DIR>$(Configuration.Replace(' ',''))</BUILD_ALT_DIR>
-    <IntDir>$(SolutionDir)$(Platform)\$(Configuration)\$(TargetName)\Out\</IntDir>
   </PropertyGroup>
   <ImportGroup Label="PreConfiguration">
     <Import Project="$(VCTargetsPath)\WDKConversion\PreConfiguration.props" />
@@ -57,9 +56,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <PropertyGroup>
-    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\</OutDir>
-  </PropertyGroup>
+  <Import Project="$(SolutionDir)\..\bsp.props" />
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalOptions>/source-charset:.1252 %(AdditionalOptions)</AdditionalOptions>
