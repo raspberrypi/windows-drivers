@@ -9,6 +9,9 @@ Abstract:
 
 #pragma once
 
+// Fix warning from stdunk.h by disabling back-compat hack.
+#define _NEW_DELETE_OPERATORS_
+
 #include <portcls.h>
 #include <stdunk.h>
 #include <ksdebug.h>

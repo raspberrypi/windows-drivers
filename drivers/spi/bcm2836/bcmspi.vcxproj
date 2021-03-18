@@ -53,10 +53,7 @@
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>False</UseDebugLibraries>
   </PropertyGroup>
-  <!-- Needed by any VcxProj -->
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
     <Import Project="$(SolutionDir)\..\bsp.props" />
@@ -73,80 +70,30 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
     <Import Project="$(SolutionDir)\..\bsp.props" />
   </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <!-- The WrappedTaskItems label is used by the conversion tool to identify the location where items 
-        associated with wrapped tasks will reside.-->
-  <ItemGroup Label="WrappedTaskItems">
-    <OtherWpp Include="resource.rc">
-      <WppEnabled>true</WppEnabled>
-      <WppKernelMode>true</WppKernelMode>
-      <WppScanConfigurationData>spitrace.h</WppScanConfigurationData>
-      <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
-    </OtherWpp>
-  </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <ClCompile>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
-      <EnablePREfast>false</EnablePREfast>
-      <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData>spitrace.h</WppScanConfigurationData>
-    </ClCompile>
-  </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <ClCompile>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
-      <EnablePREfast>false</EnablePREfast>
-      <WppEnabled>true</WppEnabled>
-      <WppScanConfigurationData>spitrace.h</WppScanConfigurationData>
+      <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <ClCompile>
-      <EnablePREfast>false</EnablePREfast>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
-      <WppEnabled>true</WppEnabled>
       <WppScanConfigurationData>spitrace.h</WppScanConfigurationData>
+      <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
+    <ClCompile>
+      <WppScanConfigurationData>spitrace.h</WppScanConfigurationData>
+      <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
-      <EnablePREfast>false</EnablePREfast>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
-      <WppEnabled>true</WppEnabled>
-      <WppScanConfigurationData>spitrace.h</WppScanConfigurationData>
-    </ClCompile>
-  </ItemDefinitionGroup>
-  <ItemGroup>
-    <!-- We only add items (e.g. form ClSourceFiles) that do not already exist (e.g in the ClCompile list), this avoids duplication -->
-    <ClCompile Include="@(ClSourceFiles)" Exclude="@(ClCompile)">
-      <WppEnabled>true</WppEnabled>
-      <WppKernelMode>true</WppKernelMode>
       <WppScanConfigurationData>spitrace.h</WppScanConfigurationData>
       <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
     </ClCompile>
-    <ResourceCompile Include="@(RcSourceFiles)" Exclude="@(ResourceCompile)" />
-    <Midl Include="@(IdlSourceFiles)" Exclude="@(Midl)" />
-    <MessageCompile Include="@(McSourceFiles)" Exclude="@(MessageCompile)" />
-    <MASM Include="@(AsmSourceFiles)" Exclude="@(MASM)" />
-    <GenerateBmf Include="@(MofSourceFiles)" Exclude="@(GenerateBmf)" />
-  </ItemGroup>
-  <!-- Set default environment variables, e.g. for stampinf -->
+  </ItemDefinitionGroup>
   <ItemGroup>
     <BuildMacro Include="SDK_INC_PATH">
       <Value>$(KIT_SHARED_INC_PATH)</Value>
@@ -154,23 +101,39 @@
     </BuildMacro>
   </ItemGroup>
   <ItemGroup>
-    <Inf Exclude="@(Inf)" Include="$(DDK_INF_FILES)" />
-    <Inf Exclude="@(Inf)" Include="*.inf" />
     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
     <FilesToPackage Include="$(DDK_PACKAGE_FILES)" />
-  </ItemGroup>
-  <!-- Necessary to pick up proper files from local directory when in the IDE-->
-  <ItemGroup>
-    <None Include="License.txt" />
-    <None Exclude="@(None)" Include="*.ico;*.cur;*.bmp;*.dlg;*.rct;*.gif;*.jpg;*.jpeg;*.wav;*.jpe;*.tiff;*.tif;*.png;*.rc2" />
-    <None Exclude="@(None)" Include="*.def;*.bat;*.hpj;*.asmx" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Exclude="@(ClInclude)" Include="*.h;*.hpp;*.hxx;*.hm;*.inl;*.xsd" />
   </ItemGroup>
   <ItemGroup>
     <PkgGen Include="bcmspi.pkg.xml" />
   </ItemGroup>
-  <!-- /Necessary to pick up proper files from local directory when in the IDE-->
+  <ItemGroup>
+    <ClInclude Include="bcmspi.h" />
+    <ClInclude Include="controller.h" />
+    <ClInclude Include="device.h" />
+    <ClInclude Include="driver.h" />
+    <ClInclude Include="internal.h" />
+    <ClInclude Include="spitrace.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="bcmspi.inf" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="bcmspi.pkg.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="controller.cpp" />
+    <ClCompile Include="device.cpp" />
+    <ClCompile Include="driver.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="License.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

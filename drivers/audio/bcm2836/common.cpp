@@ -1880,3 +1880,34 @@ Return Value:
     return ntStatus;
 }
 
+void* __cdecl operator new
+(
+    size_t          iSize,
+    _When_((poolType& NonPagedPoolMustSucceed) != 0,
+        __drv_reportError("Must succeed pool allocations are forbidden. "
+            "Allocation failures cause a system crash"))
+    POOL_TYPE       poolType,
+    ULONG           tag
+)
+{
+    void* result = ExAllocatePoolWithTag(poolType, iSize, tag);
+    if (result)
+    {
+        RtlZeroMemory(result, iSize);
+    }
+
+    return result;
+}
+
+void __cdecl operator delete
+(
+    _Pre_maybenull_ __drv_freesMem(Mem) void* pVoid,
+    _In_ size_t cbSize
+)
+{
+    UNREFERENCED_PARAMETER(cbSize);
+    if (pVoid)
+    {
+        ExFreePool(pVoid);
+    }
+}

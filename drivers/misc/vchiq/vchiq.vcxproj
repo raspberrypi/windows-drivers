@@ -71,90 +71,104 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
     <Import Project="$(SolutionDir)\..\bsp.props" />
   </ImportGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <SignMode>Off</SignMode>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <RunCodeAnalysis>true</RunCodeAnalysis>
-    <SignMode>Off</SignMode>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <SignMode>Off</SignMode>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <RunCodeAnalysis>true</RunCodeAnalysis>
-    <SignMode>Off</SignMode>
-  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <ClCompile>
-      <WppEnabled>true</WppEnabled>
       <WppKernelMode>true</WppKernelMode>
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppAddAlternateNameToMessageGUID>vchiq</WppAddAlternateNameToMessageGUID>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
       <EnablePREfast>false</EnablePREfast>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <ClCompile>
-      <WppEnabled>true</WppEnabled>
       <WppKernelMode>true</WppKernelMode>
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppAddAlternateNameToMessageGUID>vchiq</WppAddAlternateNameToMessageGUID>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
       <EnablePREfast>false</EnablePREfast>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <ClCompile>
-      <WppEnabled>true</WppEnabled>
       <WppKernelMode>true</WppKernelMode>
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppAddAlternateNameToMessageGUID>vchiq</WppAddAlternateNameToMessageGUID>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
       <EnablePREfast>false</EnablePREfast>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <ClCompile>
-      <WppEnabled>true</WppEnabled>
       <WppKernelMode>true</WppKernelMode>
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppAddAlternateNameToMessageGUID>vchiq</WppAddAlternateNameToMessageGUID>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
-      <WppRecorderEnabled>true</WppRecorderEnabled>
       <EnablePREfast>false</EnablePREfast>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="@(ClSourceFiles)" Exclude="@(ClCompile)" />
-    <ResourceCompile Include="@(RcSourceFiles)" Exclude="@(ResourceCompile)" />
-    <Midl Include="@(IdlSourceFiles)" Exclude="@(Midl)" />
-    <MessageCompile Include="@(McSourceFiles)" Exclude="@(MessageCompile)" />
-    <MASM Include="@(AsmSourceFiles)" Exclude="@(MASM)" />
-    <GenerateBmf Include="@(MofSourceFiles)" Exclude="@(GenerateBmf)" />
-  </ItemGroup>
-  <ItemGroup Label="EndElement">
-    <Inf Exclude="@(Inf)" Include="*.inf" />
     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
-  </ItemGroup>
-  <ItemGroup Label="EndElement">
-    <None Include="License.txt" />
-    <None Exclude="@(None)" Include="*.txt;*.htm;*.html" />
-    <None Exclude="@(None)" Include="*.ico;*.cur;*.bmp;*.dlg;*.rct;*.gif;*.jpg;*.jpeg;*.wav;*.jpe;*.tiff;*.tif;*.png;*.rc2" />
-    <None Exclude="@(None)" Include="*.def;*.bat;*.hpj;*.asmx" />
-  </ItemGroup>
-  <ItemGroup Label="EndElement">
-    <ClInclude Exclude="@(ClInclude)" Include="*.h;*.hpp;*.hxx;*.hm;*.inl;*.xsd" />
   </ItemGroup>
   <ItemGroup>
     <PkgGen Include="vchiq.pkg.xml" />
   </ItemGroup>
-  <!-- /Necessary to pick up proper files from local directory when in the IDE-->
+  <ItemGroup>
+    <ClCompile Include="device.c" />
+    <ClCompile Include="driver.c" />
+    <ClCompile Include="file.c" />
+    <ClCompile Include="init.c" />
+    <ClCompile Include="interrupt.c" />
+    <ClCompile Include="ioctl.c" />
+    <ClCompile Include="memory.c" />
+    <ClCompile Include="slots.c" />
+    <ClCompile Include="trace.c" />
+    <ClCompile Include="transfer.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="device.h" />
+    <ClInclude Include="driver.h" />
+    <ClInclude Include="file.h" />
+    <ClInclude Include="init.h" />
+    <ClInclude Include="interrupt.h" />
+    <ClInclude Include="ioctl.h" />
+    <ClInclude Include="memory.h" />
+    <ClInclude Include="precomp.h" />
+    <ClInclude Include="slots.h" />
+    <ClInclude Include="slotscommon.h" />
+    <ClInclude Include="trace.h" />
+    <ClInclude Include="transfer.h" />
+    <ClInclude Include="vchiq.h" />
+    <ClInclude Include="vchiq_2835.h" />
+    <ClInclude Include="vchiq_cfg.h" />
+    <ClInclude Include="vchiq_common.h" />
+    <ClInclude Include="vchiq_core.h" />
+    <ClInclude Include="vchiq_if.h" />
+    <ClInclude Include="vchiq_ioctl.h" />
+    <ClInclude Include="vchiq_pagelist.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="License.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="vchiq.inf" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="vchiq.pkg.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\userland\interface\vchiq_arm\vchiq_arm_kern.vcxproj">
+      <Project>{9db72b9a-642b-4b27-a118-91deebf5a073}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\userland\interface\vcos\generic\vcos_win32_kern_generic.vcxproj">
+      <Project>{824bae1c-53bc-4137-a07f-af6582316a7c}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\userland\interface\vcos\win32\vcos_win32_kern.vcxproj">
+      <Project>{2df1927e-bbd9-40fd-9658-88c9fb1c9340}</Project>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
