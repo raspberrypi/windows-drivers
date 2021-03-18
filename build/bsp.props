@@ -6,7 +6,7 @@
     <ConversionToolVersion>1.0</ConversionToolVersion>
     <IntDir Condition="'$(Platform)'!='Win32'">$(SolutionDir)$(Platform)\$(Configuration)\Intermediate\$(TargetName)\</IntDir>
     <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\Output\</OutDir>
-</PropertyGroup>
+  </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <WppEnabled>true</WppEnabled>
