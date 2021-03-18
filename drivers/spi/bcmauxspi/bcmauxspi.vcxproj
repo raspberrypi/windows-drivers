@@ -53,59 +53,16 @@
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>False</UseDebugLibraries>
   </PropertyGroup>
-  <!-- Needed by any VcxProj -->
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
-    <Import Project="$(SolutionDir)\..\bsp.props" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
-    <Import Project="$(SolutionDir)\..\bsp.props" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
-    <Import Project="$(SolutionDir)\..\bsp.props" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
-    <Import Project="$(SolutionDir)\..\bsp.props" />
-  </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-  </PropertyGroup>
-  <!-- The WrappedTaskItems label is used by the conversion tool to identify the location where items 
-        associated with wrapped tasks will reside.-->
-  <ItemGroup Label="WrappedTaskItems">
-    <OtherWpp Include="resource.rc">
-      <WppEnabled>true</WppEnabled>
-      <WppKernelMode>true</WppKernelMode>
-      <WppScanConfigurationData>trace.h</WppScanConfigurationData>
-      <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
-    </OtherWpp>
-  </ItemGroup>
+  <Import Project="$(SolutionDir)\..\bsp.props" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <ClCompile>
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <EnablePREfast>false</EnablePREfast>
       <WppEnabled>true</WppEnabled>
+      <WppKernelMode>true</WppKernelMode>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
+      <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
       <WarningVersion>18</WarningVersion>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -114,7 +71,9 @@
       <EnablePREfast>false</EnablePREfast>
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppEnabled>true</WppEnabled>
+      <WppKernelMode>true</WppKernelMode>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
+      <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
       <WarningVersion>18</WarningVersion>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -123,7 +82,9 @@
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <EnablePREfast>false</EnablePREfast>
       <WppEnabled>true</WppEnabled>
+      <WppKernelMode>true</WppKernelMode>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
+      <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
       <WarningVersion>18</WarningVersion>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -132,24 +93,12 @@
       <EnablePREfast>false</EnablePREfast>
       <WppRecorderEnabled>true</WppRecorderEnabled>
       <WppEnabled>true</WppEnabled>
-      <WppScanConfigurationData>trace.h</WppScanConfigurationData>
-      <WarningVersion>18</WarningVersion>
-    </ClCompile>
-  </ItemDefinitionGroup>
-  <ItemGroup>
-    <!-- We only add items (e.g. form ClSourceFiles) that do not already exist (e.g in the ClCompile list), this avoids duplication -->
-    <ClCompile Include="@(ClSourceFiles)" Exclude="@(ClCompile)">
-      <WppEnabled>true</WppEnabled>
       <WppKernelMode>true</WppKernelMode>
       <WppScanConfigurationData>trace.h</WppScanConfigurationData>
       <WppTraceFunction>Trace(LEVEL,FLAGS,MSG,...)</WppTraceFunction>
+      <WarningVersion>18</WarningVersion>
     </ClCompile>
-    <ResourceCompile Include="@(RcSourceFiles)" Exclude="@(ResourceCompile)" />
-    <Midl Include="@(IdlSourceFiles)" Exclude="@(Midl)" />
-    <MessageCompile Include="@(McSourceFiles)" Exclude="@(MessageCompile)" />
-    <MASM Include="@(AsmSourceFiles)" Exclude="@(MASM)" />
-    <GenerateBmf Include="@(MofSourceFiles)" Exclude="@(GenerateBmf)" />
-  </ItemGroup>
+  </ItemDefinitionGroup>
   <!-- Set default environment variables, e.g. for stampinf -->
   <ItemGroup>
     <BuildMacro Include="SDK_INC_PATH">
@@ -158,25 +107,35 @@
     </BuildMacro>
   </ItemGroup>
   <ItemGroup>
-    <Inf Exclude="@(Inf)" Include="$(DDK_INF_FILES)" />
-    <Inf Exclude="@(Inf)" Include="*.inf" />
     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
     <FilesToPackage Include="$(DDK_PACKAGE_FILES)" />
   </ItemGroup>
-  <!-- Necessary to pick up proper files from local directory when in the IDE-->
   <ItemGroup>
-    <None Include="License.txt" />
-    <None Exclude="@(None)" Include="*.ico;*.cur;*.bmp;*.dlg;*.rct;*.gif;*.jpg;*.jpeg;*.wav;*.jpe;*.tiff;*.tif;*.png;*.rc2" />
-    <None Exclude="@(None)" Include="*.def;*.bat;*.hpj;*.asmx" />
+    <PkgGen Include="bcmauxspi.pkg.xml" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Exclude="@(ClInclude)" Include="*.h;*.hpp;*.hxx;*.hm;*.inl;*.xsd" />
+    <ClCompile Include="bcmauxspi.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <PkgGen Include="bcmauxspi.pkg.xml">
-      <SubType>Designer</SubType>
-    </PkgGen>
+    <ClInclude Include="bcmauxspi-hw.h" />
+    <ClInclude Include="bcmauxspi.h" />
+    <ClInclude Include="precomp.h" />
+    <ClInclude Include="trace.h" />
   </ItemGroup>
-  <!-- /Necessary to pick up proper files from local directory when in the IDE-->
+  <ItemGroup>
+    <Inf Include="bcmauxspi.inf" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="bcmauxspi.pkg.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="License.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="resource.rc" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

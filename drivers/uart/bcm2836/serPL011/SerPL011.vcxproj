@@ -1,8 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <!-- @@BEGIN_DDKSPLIT -->
-  <!-- NOTE: All PropertyGroups here should be labeled, always. Otherwise the IDE does not reflect the values of all properties in the UI. The label value may be arbitrary.-->
-  <!-- @@END_DDKSPLIT -->
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|ARM">
       <Configuration>Debug</Configuration>
@@ -39,10 +36,6 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{FBCA6494-E3BE-4790-A521-C711CD24FF95}</ProjectGuid>
     <RootNamespace>$(MSBuildProjectName)</RootNamespace>
-    <!-- @@BEGIN_DDKSPLIT -->
-    <!-- Default values for <Configuration> and <Platform> will be inserted here by the conversion tool-->
-    <!-- The project configurations list will be inserted by the conversion tool after this Globals group -->
-    <!-- @@END_DDKSPLIT -->
   </PropertyGroup>
   <PropertyGroup Label="Configuration" Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <TargetVersion>Windows10</TargetVersion>
@@ -60,46 +53,9 @@
     <TargetVersion>Windows10</TargetVersion>
     <UseDebugLibraries>False</UseDebugLibraries>
   </PropertyGroup>
-  <!-- Needed by any VcxProj -->
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
-  <ImportGroup Label="ExtensionSettings">
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
-    <Import Project="$(SolutionDir)\..\bsp.props" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
-    <Import Project="$(SolutionDir)\..\bsp.props" />
-  </ImportGroup>
-  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
-    <Import Project="$(SolutionDir)\..\bsp.props" />
-  </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'" Label="PropertySheets">
-    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
-    <Import Project="$(SolutionDir)\..\bsp.props" />
-  </ImportGroup>
-  <PropertyGroup Label="UserMacros" />
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <CodeAnalysisRuleSet>..\..\..\..\..\..\..\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverMinimumRules.ruleset</CodeAnalysisRuleSet>
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
-    <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <CodeAnalysisRuleSet>..\..\..\..\..\..\..\Program Files (x86)\Windows Kits\10\CodeAnalysis\DriverMinimumRules.ruleset</CodeAnalysisRuleSet>
-    <RunCodeAnalysis>false</RunCodeAnalysis>
-  </PropertyGroup>
-  <!-- The WrappedTaskItems label is used by the conversion tool to identify the location where items 
-        associated with wrapped tasks will reside.-->
-  <ItemGroup Label="WrappedTaskItems">
+  <Import Project="$(SolutionDir)\..\bsp.props" />
+  <ItemGroup>
     <PkgGen Include="SerPL011.pkg.xml" />
   </ItemGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Arm'">
@@ -154,15 +110,6 @@
       <EnablePREfast>false</EnablePREfast>
     </ClCompile>
   </ItemDefinitionGroup>
-  <ItemGroup>
-    <!-- We only add items (e.g. form ClSourceFiles) that do not already exist (e.g in the ClCompile list), this avoids duplication -->
-    <ClCompile Include="@(ClSourceFiles)" Exclude="@(ClCompile)" />
-    <ResourceCompile Include="@(RcSourceFiles)" Exclude="@(ResourceCompile)" />
-    <Midl Include="@(IdlSourceFiles)" Exclude="@(Midl)" />
-    <MessageCompile Include="@(McSourceFiles)" Exclude="@(MessageCompile)" />
-    <MASM Include="@(AsmSourceFiles)" Exclude="@(MASM)" />
-    <GenerateBmf Include="@(MofSourceFiles)" Exclude="@(GenerateBmf)" />
-  </ItemGroup>
   <!-- Set default environment variables, e.g. for stampinf -->
   <ItemGroup>
     <BuildMacro Include="SDK_INC_PATH">
@@ -171,20 +118,47 @@
     </BuildMacro>
   </ItemGroup>
   <ItemGroup>
-    <Inf Exclude="@(Inf)" Include="$(DDK_INF_FILES)" />
-    <Inf Exclude="@(Inf)" Include="*.inf" />
     <FilesToPackage Include="$(TargetPath)" Condition="'$(ConfigurationType)'=='Driver' or '$(ConfigurationType)'=='DynamicLibrary'" />
     <FilesToPackage Include="$(DDK_PACKAGE_FILES)" />
   </ItemGroup>
-  <!-- Necessary to pick up proper files from local directory when in the IDE-->
   <ItemGroup>
-    <None Exclude="@(None)" Include="*.txt;*.htm;*.html" />
-    <None Exclude="@(None)" Include="*.ico;*.cur;*.bmp;*.dlg;*.rct;*.gif;*.jpg;*.jpeg;*.wav;*.jpe;*.tiff;*.tif;*.png;*.rc2" />
-    <None Exclude="@(None)" Include="*.def;*.bat;*.hpj;*.asmx" />
+    <Text Include="License.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Exclude="@(ClInclude)" Include="*.h;*.hpp;*.hxx;*.hm;*.inl;*.xsd" />
+    <ResourceCompile Include="PL011.rc" />
   </ItemGroup>
-  <!-- /Necessary to pick up proper files from local directory when in the IDE-->
+  <ItemGroup>
+    <ClCompile Include="PL011common.cpp" />
+    <ClCompile Include="PL011device.cpp" />
+    <ClCompile Include="PL011driver.cpp" />
+    <ClCompile Include="PL011hw.cpp" />
+    <ClCompile Include="PL011interrupt.cpp" />
+    <ClCompile Include="PL011ioctl.cpp" />
+    <ClCompile Include="pl011rx.cpp" />
+    <ClCompile Include="PL011tx.cpp" />
+    <ClCompile Include="PL011uart.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PL011common.h" />
+    <ClInclude Include="PL011device.h" />
+    <ClInclude Include="PL011driver.h" />
+    <ClInclude Include="PL011hw.h" />
+    <ClInclude Include="PL011interrupt.h" />
+    <ClInclude Include="PL011ioctl.h" />
+    <ClInclude Include="PL011logging.h" />
+    <ClInclude Include="PL011rx.h" />
+    <ClInclude Include="PL011tx.h" />
+    <ClInclude Include="PL011uart.h" />
+    <ClInclude Include="precomp.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="SerPL011.inf" />
+  </ItemGroup>
+  <ItemGroup>
+    <Xml Include="SerPL011.pkg.xml" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
