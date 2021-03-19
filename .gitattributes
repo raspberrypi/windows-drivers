@@ -2,4 +2,4 @@
 # Set default behavior to automatically normalize line endings.
 ###############################################################################
 * text=auto
-*.inf text working-tree-encoding=UTF-16
+*.inf text working-tree-encoding=UTF-16LE-BOM
