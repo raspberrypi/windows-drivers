@@ -52,6 +52,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vchiq_arm_kern", "..\..\dri
 		{2DF1927E-BBD9-40FD-9658-88C9FB1C9340} = {2DF1927E-BBD9-40FD-9658-88C9FB1C9340}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bcmemmc2", "..\..\drivers\sd\bcm2711\bcmemmc2\bcmemmc2.vcxproj", "{2043AEDC-A745-4436-A13C-8079EDE147D6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -196,6 +198,14 @@ Global
 		{9DB72B9A-642B-4B27-A118-91DEEBF5A073}.Release|ARM.Build.0 = Release|ARM
 		{9DB72B9A-642B-4B27-A118-91DEEBF5A073}.Release|ARM64.ActiveCfg = Release|ARM64
 		{9DB72B9A-642B-4B27-A118-91DEEBF5A073}.Release|ARM64.Build.0 = Release|ARM64
+		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Debug|ARM.ActiveCfg = Debug|ARM
+		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Debug|ARM.Build.0 = Debug|ARM
+		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Debug|ARM64.ActiveCfg = Debug|ARM
+		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Debug|ARM64.Build.0 = Debug|ARM
+		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Release|ARM.ActiveCfg = Release|ARM
+		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Release|ARM.Build.0 = Release|ARM
+		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Release|ARM64.ActiveCfg = Release|ARM64
+		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Release|ARM64.Build.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
