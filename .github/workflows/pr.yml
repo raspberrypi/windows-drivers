@@ -1,0 +1,26 @@
+name: pr-build
+
+on:
+  pull_request:
+    branches:
+      - master
+
+env:
+  SOLUTION_FILE_PATH: .\build\bcm2836\buildbcm2836.sln
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        BUILD_CONFIGURATION: [Release, Debug]
+        PLATFORM: [ARM, ARM64]
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v1
+
+    - name: Build
+      working-directory: ${{env.GITHUB_WORKSPACE}}
+      run: msbuild /m /p:Configuration=${{matrix.BUILD_CONFIGURATION}} /p:Platform=${{matrix.PLATFORM}} ${{env.SOLUTION_FILE_PATH}}
