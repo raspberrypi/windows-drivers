@@ -30,7 +30,7 @@ PnpLockdown = 1
 [Manufacturer]
 %Broadcom% = Broadcom, NT$ARCH$
 
-[Broadcom.NTarm64]
+[Broadcom.NT$ARCH$]
 %ACPI\BRCME88C.DeviceDesc% = SDHostEMMC2, ACPI\BRCME88C
 
 ; ///////////////////////////////////////////////////////////
