@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<API_EXCEPTION_WHITELIST>
+  <APIs>
+    <API Name="SdPortCompleteRequest"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortGetPciConfigSpace"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortInitialize"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortReadRegisterBufferUchar"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortReadRegisterBufferUlong"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortReadRegisterBufferUshort"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortReadRegisterUchar"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortReadRegisterUlong"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortReadRegisterUshort"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortWait"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortWriteRegisterBufferUchar"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortWriteRegisterBufferUlong"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortWriteRegisterBufferUshort"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortWriteRegisterUchar"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortWriteRegisterUlong"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+    <API Name="SdPortWriteRegisterUshort"  ModuleName="sdport.sys" AitCategory="ApiStatic" />
+  </APIs>
+</API_EXCEPTION_WHITELIST>
