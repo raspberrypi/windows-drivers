@@ -22,7 +22,7 @@
     <PlatformToolset>WindowsKernelModeDriver10.0</PlatformToolset>
     <ConfigurationType>Driver</ConfigurationType>
     <DriverType>WDM</DriverType>
-    <TARGETNAME>sdhc</TARGETNAME>
+    <TARGETNAME>$(MSBuildProjectName)</TARGETNAME>
     <DriverTargetPlatform>Universal</DriverTargetPlatform>
     <Configuration Condition="'$(Configuration)' == ''">Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">ARM64</Platform>
@@ -78,33 +78,25 @@
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)sdport.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <ClCompile>
-      <CompileAs>CompileAsC</CompileAs>
-    </ClCompile>
+    <ClCompile />
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)sdport.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <ClCompile>
-      <CompileAs>CompileAsC</CompileAs>
-    </ClCompile>
+    <ClCompile />
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)sdport.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <ClCompile>
-      <CompileAs>CompileAsC</CompileAs>
-    </ClCompile>
+    <ClCompile />
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <Link>
       <AdditionalDependencies>$(DDK_LIB_PATH)sdport.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
-    <ClCompile>
-      <CompileAs>CompileAsC</CompileAs>
-    </ClCompile>
+    <ClCompile />
   </ItemDefinitionGroup>
   <ItemGroup>
     <BuildMacro Include="SDK_INC_PATH">

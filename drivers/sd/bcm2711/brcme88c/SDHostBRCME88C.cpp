@@ -1,32 +1,10 @@
-/*++
-
-Copyright (c) 2002-2014  Microsoft Corporation
-
-Module Name:
-
-    sdhc.c
-
-Abstract:
-
-    This file contains the code that interfaces with standard host controller
-    implementations.
-
-Author:
-
-    Greg Garbern (greggar) 01-May-2014
-
-Environment:
-
-    Kernel mode only.
-
-Revision History:
-
-    Greg Garbern (greggar) 12-June-2014
-
---*/
+// Adapted from sample code: Copyright (c) Microsoft Corporation
+// https://github.com/microsoft/Windows-driver-samples/tree/master/sd/miniport/sdhc
 
 #include <ntddk.h>
-#include <sdport.h>
+extern "C" {
+    #include <sdport.h>
+}
 #include "SDHostBRCME88C.h"
 
 #ifdef ALLOC_PRAGMA
@@ -37,10 +15,13 @@ Revision History:
 // SlotExtension routines.
 //-----------------------------------------------------------------------------
 
+_Use_decl_annotations_
+extern "C"
 NTSTATUS
+__declspec(code_seg("INIT"))
 DriverEntry(
-    _In_ PVOID DriverObject,
-    _In_ PVOID RegistryPath
+    _In_ struct _DRIVER_OBJECT *DriverObject,
+    _In_ PUNICODE_STRING RegistryPath
     )
 
 /*++
@@ -455,6 +436,7 @@ Return value:
     return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSlotIssueBusOperation(
     _In_ PVOID PrivateExtension,
@@ -655,6 +637,10 @@ Return value:
 
     SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
     *Events = (ULONG) SdhcGetInterruptStatus(SdhcExtension);
+    *Errors = 0;
+    *CardChange = 0;
+    *SdioInterrupt = 0;
+    *Tuning = 0;
 
     //
     // If there aren't any events to handle, then we don't need to
@@ -1081,11 +1067,11 @@ Return value:
 // Host routine implementations.
 //-----------------------------------------------------------------------------
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcResetHost(
     _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ UCHAR ResetType
+    _In_ SDPORT_RESET_TYPE ResetType
     )
 
 /*++
@@ -1188,7 +1174,7 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetClock(
     _In_ PSDHC_EXTENSION SdhcExtension,
@@ -1274,7 +1260,7 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetVoltage(
     _In_ PSDHC_EXTENSION SdhcExtension,
@@ -1390,11 +1376,11 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetBusWidth(
     _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ UCHAR Width
+    _In_ SDPORT_BUS_WIDTH Width
     )
 
 /*++
@@ -1443,6 +1429,7 @@ Return value:
     return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetSpeed(
     _In_ PSDHC_EXTENSION SdhcExtension,
@@ -1507,7 +1494,7 @@ Return value:
     return Status;
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetHighSpeed(
     _In_ PSDHC_EXTENSION SdhcExtension,
@@ -1546,7 +1533,7 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetUhsMode(
     _In_ PSDHC_EXTENSION SdhcExtension,
@@ -1609,7 +1596,7 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetSignaling(
     _In_ PSDHC_EXTENSION SdhcExtension,
@@ -1722,7 +1709,7 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-_IRQL_requires_max_(PASSIVE_LEVEL)
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcExecuteTuning(
     _In_ PSDHC_EXTENSION SdhcExtension
@@ -1840,6 +1827,7 @@ Return value:
     SdhcWriteRegisterUchar(SdhcExtension, SDHC_HOST_CONTROL, HostControl);
 }
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetPresetValue(
     _In_ PSDHC_EXTENSION SdhcExtension,
@@ -1882,6 +1870,7 @@ Return value:
     return STATUS_SUCCESS;
 }
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcEnableBlockGapInterrupt(
     _In_ PSDHC_EXTENSION SdhcExtension,
@@ -3076,7 +3065,7 @@ USHORT
 SdhcCalcClockFrequency(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ ULONG TargetFrequency,
-    _Out_opt_ PULONG ActualFrequency
+    _Out_ PULONG ActualFrequency
     )
 
 /*++
@@ -3206,7 +3195,7 @@ Return value:
     ULONG RemainingLength;
     PSCATTER_GATHER_ELEMENT SglistElement;
     
-    Buffer = Request->Command.DmaVirtualAddress;
+    Buffer = static_cast<UCHAR*>(Request->Command.DmaVirtualAddress);
     Descriptor = NULL;
     NumberOfElements = Request->Command.ScatterGatherList->NumberOfElements;
     SglistElement = &Request->Command.ScatterGatherList->Elements[0];

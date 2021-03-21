@@ -1,27 +1,14 @@
----
-page_type: sample
-description: "Provides a functional miniport implementation for a standard SD host controller."
-languages:
-- cpp
-products:
-- windows
-- windows-wdk
----
+# Broadcom SD Host (BRCME88C) for Raspberry Pi 4
 
-# Standard SD Host Controller Miniport
+Driver for the eMMC2 host controller (BRCME88C) for Raspberry Pi 4.
 
-This is a sample for a Secure Digital (SD) Host Controller miniport driver. The driver works in conjunction with sdport.sys, which implements SD/SDIO/eMMC protocol and WDM interfaces, to provide the host register interface.
+Based on the
+[Microsoft SDHC driver sample](https://github.com/microsoft/Windows-driver-samples/tree/master/sd/miniport/sdhc).
 
-## Universal Compliant
+This is an sdport miniport - it depends on the in-box sdport.sys to handle the
+SD/SDIO/eMMC protocol and WDM interfaces.
 
-This sample builds a Windows Universal driver. It uses only APIs and DDIs that are included in Windows Core.
+## TODO
 
-This driver, sdhc.sys, provides a functional miniport implementation for a standard SD host controller. 
-
-However, it does not have support for many more recent features such as:
-
-- UHS-I speed modes.
-
-- HS400
-
-- SD 4.0
+- Support higher-speed modes.
+- DMA.

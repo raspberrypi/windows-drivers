@@ -1,78 +1,62 @@
-;Copyright (c) Microsoft Corporation
-
 [Version]
 Signature="$Windows NT$"
 Class=SDHost
 ClassGUID={a0a588a4-c46f-4b37-b7ea-c82fe89870c6}
 Provider=%ProviderString%
 DriverVer=04/02/2015,10.0.10053
-CatalogFile=sdhc.cat
+CatalogFile=SDHostBRCME88C.cat
+PnpLockdown=1
 
 [SourceDisksNames]
 1 = Disk
 
 [SourceDisksFiles]
-sdhc.sys = 1
+SDHostBRCME88C.sys = 1
 
 [Manufacturer]
-%Generic%=Generic,NT$ARCH$
-%TED%=TED,NT$ARCH$
-%VIA%=VIA,NT$ARCH$
+%RPI%=RPI,NT$ARCH$
 
 [ControlFlags]
 BasicDriverOk=*
 ExcludeFromSelect=*
 
-;
-; Generic Device
-;
+[RPI.NT$ARCH$]
+%ACPI\BRCME88C.DeviceDesc%=SDHostBRCME88C, ACPI\BRCME88C
 
-[Generic.NT$ARCH$]
-%PCI\CC_080500.DeviceDesc%=SDHost, PCI\CC_080500
-%PCI\CC_080501.DeviceDesc%=SDHost, PCI\CC_080501
-%ACPI\PNP0D40.DeviceDesc%=SDHost, ACPI\PNP0D40
+[SDHostBRCME88C]
+CopyFiles=SDHostBRCME88C_CopyFiles
+AddReg=SDHostBRCME88C_Reg
 
-;
-; Non-Generic Devices
-;
-; Use Generic Device Description (%PCI\CC_080501.DeviceDesc%) to
-; minimize localization.
-;
-; Otherwise, instances of %PCI\CC_080501.DeviceDesc% should be replaced by 
-; %<SpecificID...>%
-;
+[SDHostBRCME88C_CopyFiles]
+SDHostBRCME88C.sys
 
-[TED.NT$ARCH$]
-%PCI\VEN_1679&DEV_3000.DeviceDesc%=SDHost, PCI\VEN_1679&DEV_3000
+[DestinationDirs]
+SDHostBRCME88C_CopyFiles=12
 
-[VIA.NT$ARCH$]
-%PCI\VEN_1106&DEV_365B.DeviceDesc%=SDHost, PCI\VEN_1106&DEV_365B
-%PCI\VEN_1106&DEV_401B.DeviceDesc%=SDHost, PCI\VEN_1106&DEV_401B
-%PCI\VEN_1106&DEV_95D0.DeviceDesc%=SDHost, PCI\VEN_1106&DEV_95D0
+[SDHostBRCME88C.HW]
+AddReg=SDHostBRCME88C_LocationReg
 
-;
+[SDHostBRCME88C.Services]
+AddService = SDHostBRCME88C, 2, SDHostBRCME88C_ServiceInst
+
 ; Service install
-;
-
-[sdhc_Service_Inst]
-ServiceType    = %SERVICE_KERNEL_DRIVER%
-StartType      = %SERVICE_DEMAND_START%
-ErrorControl   = %SERVICE_ERROR_NORMAL%
-ServiceBinary  = %12%\sdhc.sys
+[SDHostBRCME88C_ServiceInst]
+ServiceType    = 1 ; SERVICE_KERNEL_DRIVER
+StartType      = 3 ; SERVICE_DEMAND_START
+ErrorControl   = 1 ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\SDHostBRCME88C.sys
 LoadOrderGroup = System Bus Extender
-AddReg         = SDHCServiceReg
+AddReg         = SDHostBRCME88C_ServiceReg
 
-;
 ; Registry keys
-;
 
-[SDHCLocationReg]
-HKR,,UINumberDescFormat,,%SDHCSlot%
+[SDHostBRCME88C_Reg]
+HKR,,Driver,,"SDHostBRCME88C.sys"
 
-[SDHCReg]
-HKR,,Driver,,"sdhc.sys"
+[SDHostBRCME88C_LocationReg]
+HKR,,UINumberDescFormat,,%SDHostBRCME88C_Slot%
 
-[SDHCServiceReg]
+[SDHostBRCME88C_ServiceReg]
 HKR,,BootFlags,0x00010003,0x00000008
 HKR,Parameters,SdCmdFlags,1,    05,01, 06,01, 08,11, 09,19, 0A,19, 0D,11, \
                                 10,01, 11,01, 12,01, 17,01, 18,05, 19,05, \
@@ -87,89 +71,12 @@ HKR,Parameters,SdAppCmdFlags,1, 06,01, 0D,01, 16,01, 17,01, 33,01, \
                                 12,01, 19,01, 1A,01, 26,01, 2B,01, \
                                 2C,01, 2D,01, 2E,01, 2F,01, 30,01, 31,01
 
-;
-; Copy Files
-;
-
-[CSCopyFiles]
-sdhc.sys
-
-[DestinationDirs]
-CSCopyFiles=12
-
-;
-; Controller Specific Sections
-;
-
-;
-; Standard host controller
-;
-
-[SDHost]
-CopyFiles=CSCopyFiles
-AddReg=SDHCReg
-
-[SDHost.Services]
-AddService = sdhc, 2, sdhc_Service_Inst
-
-[SDHost.HW]
-AddReg=SDHCLocationReg
-
 [Strings]
-;
-; Localizable strings below
-;
 
-Generic="SDA Standard Compliant SD Host Controller Vendor"
+; Manufacturer
+RPI="Raspberry Pi"
 
-;
-; Device Decription strings
-;
+ACPI\BRCME88C.DeviceDesc="Broadcom SD Host (BRCME88C) for Raspberry Pi 4"
+SDHostBRCME88C_Slot="SD Host Slot %1!u!"
 
-PCI\VEN_1679&DEV_3000.DeviceDesc="Tokyo Electron SD Standard host controller"
-
-PCI\VEN_1106&DEV_365B.DeviceDesc="VIA Secure Digital host controller"
-PCI\VEN_1106&DEV_401B.DeviceDesc="VIA Secure Digital host controller"
-PCI\VEN_1106&DEV_95D0.DeviceDesc="VIA Secure Digital host controller"
-
-PCI\CC_080500.DeviceDesc="SDA Standard Compliant SD Host Controller"
-PCI\CC_080501.DeviceDesc="SDA Standard Compliant SD Host Controller"
-
-;
-; SoC
-;
-
-;
-; The IDs marked deprecated are not finalized and need to be replaced 
-; by the correct IDs the vendors supply in the firmware.
-;
-
-ACPI\PNP0D40.DeviceDesc="SDA Standard Compliant SD Host Controller"
-
-;
-; Slot description string
-;
-
-SDHCSlot="SD Host Slot %1!u!"
-
-;
-; Non-localizable strings below
-;
-
-SERVICE_KERNEL_DRIVER = 1
-SERVICE_BOOT_START    = 0
-SERVICE_SYSTEM_START  = 1
-SERVICE_DEMAND_START  = 3
-SERVICE_ERROR_NORMAL  = 1
-SERVICE_ERROR_IGNORE  = 0
-REG_EXPAND_SZ         = 0x00020000
-REG_DWORD             = 0x00010001
-REG_SZ                = 0x00000000
-
-;
-; Manufacturer name strings
-;
-
-ProviderString="TODO-Set-Provider"
-TED="Tokyo Electron Device"
-VIA="VIA Technologies, Inc"
+ProviderString="WoR project"

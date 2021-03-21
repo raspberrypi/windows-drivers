@@ -1,55 +1,11 @@
-/*++
+// Adapted from sample code: Copyright (c) Microsoft Corporation
+// https://github.com/microsoft/Windows-driver-samples/tree/master/sd/miniport/sdhc
 
-Copyright (c) 2014 Microsoft Corporation
-
-Module Name:
-
-    sdhc.h
-
-Abstract:
-
-    Header for default standard host controller implementation.
-
-Author:
-
-    Greg Garbern (greggar) 01-May-2014
-
-Environment:
-
-    Kernel mode only.
-
-Revision History:
-
-    Greg Garbern (greggar) 12-June-2014
-
---*/
-
-#if defined (_MSC_VER) && (_MSC_VER > 1000)
 #pragma once
-#endif
 
 #pragma warning(disable:4214)   // bit field types other than int
 #pragma warning(disable:4201)   // nameless struct/union
 #pragma warning(disable:4115)   // named type definition in parentheses
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 //
 // Memory registers
@@ -1387,11 +1343,8 @@ typedef struct _SDHC_EXTENSION {
 
 #define SDHC_PCICFG_SLOT_INFORMATION    0x40
 
-NTSTATUS
-DriverEntry(
-    _In_ PVOID DriverObject,
-    _In_ PVOID RegistryPath
-    );
+extern "C"
+DRIVER_INITIALIZE DriverEntry;
 
 //-----------------------------------------------------------------------------
 // SlotExtension callbacks.
@@ -1553,54 +1506,63 @@ SdhcCleanup(
 // Hardware access routines.
 //-----------------------------------------------------------------------------
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcResetHost(
     _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ UCHAR ResetType
+    _In_ SDPORT_RESET_TYPE ResetType
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetVoltage(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ SDPORT_BUS_VOLTAGE VoltageProfile
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetClock(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ ULONG Frequency
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetBusWidth(
     _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ UCHAR BusWidth
+    _In_ SDPORT_BUS_WIDTH BusWidth
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetSpeed(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ SDPORT_BUS_SPEED Speed
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetHighSpeed(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ BOOLEAN Enable
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetUhsMode(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ USHORT Mode
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetSignaling(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ BOOLEAN Enable
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcExecuteTuning(
     _In_ PSDHC_EXTENSION SdhcExtension
@@ -1612,12 +1574,14 @@ SdhcSetLed(
     _In_ BOOLEAN Enable
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetPresetValue(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ BOOLEAN Enable
     );
 
+_IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcEnableBlockGapInterrupt(
     _In_ PSDHC_EXTENSION SdhcExtension,
@@ -1763,7 +1727,7 @@ USHORT
 SdhcCalcClockFrequency(
     _In_ PSDHC_EXTENSION SdhcExtension,
     _In_ ULONG TargetFrequency,
-    _Out_opt_ PULONG ActualFrequency
+    _Out_ PULONG ActualFrequency
     );
 
 USHORT
