@@ -74,16 +74,16 @@
     <PkgGen Include="rpisdhc.pkg.xml" />
   </ItemGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
-    <ApiValidator_Enable>false</ApiValidator_Enable>
+    <ApiValidator_ModuleWhiteListFile>..\..\sdportwhitelist.xml</ApiValidator_ModuleWhiteListFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
-    <ApiValidator_Enable>false</ApiValidator_Enable>
+    <ApiValidator_ModuleWhiteListFile>..\..\sdportwhitelist.xml</ApiValidator_ModuleWhiteListFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
-    <ApiValidator_Enable>false</ApiValidator_Enable>
+    <ApiValidator_ModuleWhiteListFile>..\..\sdportwhitelist.xml</ApiValidator_ModuleWhiteListFile>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
-    <ApiValidator_Enable>false</ApiValidator_Enable>
+    <ApiValidator_ModuleWhiteListFile>..\..\sdportwhitelist.xml</ApiValidator_ModuleWhiteListFile>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <ClCompile>
