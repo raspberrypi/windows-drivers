@@ -54,6 +54,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vchiq_arm_kern", "..\..\dri
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bcmemmc2", "..\..\drivers\sd\bcm2711\bcmemmc2\bcmemmc2.vcxproj", "{2043AEDC-A745-4436-A13C-8079EDE147D6}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rpiuxflt", "..\..\drivers\usb\bcm2711\rpiuxflt\rpiuxflt.vcxproj", "{1F747444-9FD4-4B32-8450-96113506B2A7}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -206,6 +208,14 @@ Global
 		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Release|ARM.Build.0 = Release|ARM
 		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Release|ARM64.ActiveCfg = Release|ARM64
 		{2043AEDC-A745-4436-A13C-8079EDE147D6}.Release|ARM64.Build.0 = Release|ARM64
+		{1F747444-9FD4-4B32-8450-96113506B2A7}.Debug|ARM.ActiveCfg = Debug|ARM
+		{1F747444-9FD4-4B32-8450-96113506B2A7}.Debug|ARM.Build.0 = Debug|ARM
+		{1F747444-9FD4-4B32-8450-96113506B2A7}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{1F747444-9FD4-4B32-8450-96113506B2A7}.Debug|ARM64.Build.0 = Debug|ARM64
+		{1F747444-9FD4-4B32-8450-96113506B2A7}.Release|ARM.ActiveCfg = Release|ARM
+		{1F747444-9FD4-4B32-8450-96113506B2A7}.Release|ARM.Build.0 = Release|ARM
+		{1F747444-9FD4-4B32-8450-96113506B2A7}.Release|ARM64.ActiveCfg = Release|ARM64
+		{1F747444-9FD4-4B32-8450-96113506B2A7}.Release|ARM64.Build.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
