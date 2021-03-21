@@ -72,6 +72,6 @@ HKR,,BootFlags,0x10001,16
 
 [Strings]
 ProviderString = "Open Source"
-RPi = "Raspbery Pi"
+RPi = "Raspberry Pi"
 rpixhci.DeviceDesc = "Raspberry Pi 4 VIA VL805 XHCI Host Controller"
 rpiuxflt.SvcDesc = "Raspberry Pi 4 USB XHCI Filter Driver Service"

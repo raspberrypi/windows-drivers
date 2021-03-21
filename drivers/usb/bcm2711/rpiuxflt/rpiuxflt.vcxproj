@@ -31,7 +31,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ItemGroup>
-    <Inf Include="rpiuxflt.inf" />
+    <Inf Include="rpiuxflt.inx" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="rpiuxflt.h" />
