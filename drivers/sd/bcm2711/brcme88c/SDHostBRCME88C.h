@@ -7,6 +7,63 @@
 #pragma warning(disable:4201)   // nameless struct/union
 #pragma warning(disable:4115)   // named type definition in parentheses
 
+/*
+ETW trace support:
+- Start trace: tracelog -start MyLoggerName -f MyLoggerFile.etl -guid *SDHostBRCME88C -level 4
+- Stop trace:  tracelog -stop MyLoggerName
+- View with your favorite decode tool - tracefmt, traceview, tracerpt, etc.
+
+If you add -kd to the tracelog command line and run KD command "!wmitrace.dynamicprint 1",
+the events will be sent directly to KD.
+
+For boot tracing, use an autologger.
+
+The following could be used in a .REG file to enable a file-mode autologger,
+saving to c:\windows\system32\logfiles\wmi, capturing at level verbose, with
+events sent to KD in real-time. Note that LogFileMode=00080001 means
+EVENT_TRACE_FILE_MODE_SEQUENTIAL + EVENT_TRACE_KD_FILTER_MODE.
+
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\WMI\Autologger\SDHostBRCME88C]
+"Guid"="{f2782ab9-d1a5-5f95-240a-ac933a6937e2}"
+"BufferSize"=dword:00000040
+"LogFileMode"=dword:00080001
+"Status"=dword:00000000
+"Start"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\WMI\Autologger\SDHostBRCME88C\{f2782ab9-d1a5-5f95-240a-ac933a6937e2}]
+"Enabled"=dword:00000001
+"EnableLevel"=dword:00000005
+"EnableFlags"=dword:00000001
+"Status"=dword:00000000
+*/
+
+// Create a global variable named g_trace that can be used with TraceLoggingWrite.
+TRACELOGGING_DECLARE_PROVIDER(g_trace);
+
+#define SDHOST_TRACE(eventName, level, keyword, ...) TraceLoggingWrite( \
+    g_trace, \
+    eventName, \
+    TraceLoggingLevel(level), \
+    TraceLoggingKeyword(keyword), \
+    __VA_ARGS__)
+
+// All ETW events should have at least one keyword set.
+// Define a keyword that means "Log":
+#define SDHOST_KEYWORD_LOG 0x1
+
+#define LogCritical(eventName, ...) /* Critical = level 1 */ \
+    SDHOST_TRACE(eventName, TRACE_LEVEL_CRITICAL, SDHOST_KEYWORD_LOG, __VA_ARGS__)
+#define LogError(eventName, ...)    /* Error = level 2 */ \
+    SDHOST_TRACE(eventName, TRACE_LEVEL_ERROR, SDHOST_KEYWORD_LOG, __VA_ARGS__)
+#define LogWarning(eventName, ...)  /* Warning = level 3 */ \
+    SDHOST_TRACE(eventName, TRACE_LEVEL_WARNING, SDHOST_KEYWORD_LOG, __VA_ARGS__)
+#define LogInfo(eventName, ...)     /* Info = level 4 */  \
+    SDHOST_TRACE(eventName, TRACE_LEVEL_INFORMATION, SDHOST_KEYWORD_LOG, __VA_ARGS__)
+#define LogVerbose(eventName, ...)  /* Verbose = level 5 */ \
+    SDHOST_TRACE(eventName, TRACE_LEVEL_VERBOSE, SDHOST_KEYWORD_LOG, __VA_ARGS__)
+
 //
 // Memory registers
 //
@@ -306,7 +363,7 @@
 // The entire layout of an SD host controller in memory for debug purposes.
 //
 
-typedef struct _SD_HOST_CONTROLLER_REGISTERS {
+struct SD_HOST_CONTROLLER_REGISTERS {
 
     union {
         struct {
@@ -1068,7 +1125,7 @@ typedef struct _SD_HOST_CONTROLLER_REGISTERS {
         USHORT Word;         // FEh
     } HostControllerVersion;
 
-} SD_HOST_CONTROLLER_REGISTERS, *PSD_HOST_CONTROLLER_REGISTERS;
+};
 
 // the size of the SD_CONTROLLER_REGISTER structure must always be 256 bytes
 C_ASSERT(sizeof(SD_HOST_CONTROLLER_REGISTERS) == 256);
@@ -1087,7 +1144,7 @@ C_ASSERT(sizeof(SD_HOST_CONTROLLER_REGISTERS) == 256);
 // Host control register
 //
 
-typedef union _SDHC_HOST_CONTROL_REGISTER {
+union SDHC_HOST_CONTROL_REGISTER {
     struct {
         UCHAR LedControl:1;
         UCHAR DataTransferWidth:1;
@@ -1098,9 +1155,9 @@ typedef union _SDHC_HOST_CONTROL_REGISTER {
         UCHAR CardDetectSignalSlection:1;
     };
     UCHAR AsUchar;
-} SDHC_HOST_CONTROL_REGISTER, *PSDHC_HOST_CONTROL_REGISTER;
+};
 
-typedef union _SDHC_HOST_CONTROL2_REGISTER {
+union SDHC_HOST_CONTROL2_REGISTER {
     struct {
         USHORT UhsModeSelect:3;
         USHORT SignalingEnable1_8V:1;
@@ -1112,28 +1169,28 @@ typedef union _SDHC_HOST_CONTROL2_REGISTER {
         USHORT PresetValueEnable:1;
     };
     USHORT AsUshort;
-} SDHC_HOST_CONTROL2_REGISTER, *PSDHC_HOST_CONTROL2_REGISTER;
+};
         
 
 //
 // Power control register
 //
 
-typedef union _SDHC_POWER_CONTROL_REGISTER {
+union SDHC_POWER_CONTROL_REGISTER {
     struct {
         UCHAR SdBusPower:1;
         UCHAR SdBusPowerSelect:3;
         UCHAR Reserved1:4;
     };
     UCHAR AsUchar;
-} SDHC_POWER_CONTROL_REGISTER, *PSDHC_POWER_CONTROL_REGISTER;
+};
 
 
 //
 // Clock control register
 //
 
-typedef union _SDHC_CLOCK_CONTROL_REGISTER {
+union SDHC_CLOCK_CONTROL_REGISTER {
     struct {
         USHORT InternalClockEnable:1;
         USHORT InternalClockStable:1;
@@ -1142,14 +1199,14 @@ typedef union _SDHC_CLOCK_CONTROL_REGISTER {
         USHORT SdclkFrequencySelect:8;
     };
     UCHAR AsUshort;
-} SDHC_CLOCK_CONTROL_REGISTER, *PSDHC_CLOCK_CONTROL_REGISTER;
+};
 
 
 //
 // Transfer mode register
 //
 
-typedef union _SDHC_TRANSFER_MODE_REGISTER {
+union SDHC_TRANSFER_MODE_REGISTER {
     struct {
         USHORT DmaEnable:1;
         USHORT BlockCountEnable:1;
@@ -1160,14 +1217,14 @@ typedef union _SDHC_TRANSFER_MODE_REGISTER {
         USHORT Reserved2:10;
     };
     USHORT AsUshort;
-} SDHC_TRANSFER_MODE_REGISTER, *PSDHC_TRANSFER_MODE_REGISTER;
+};
 
 
 //
 // Capabilities register
 //
 
-typedef union _SDHC_CAPABILITIES_REGISTER {
+union SDHC_CAPABILITIES_REGISTER {
    struct {
         ULONG TimeoutClockFrequency:6;
         ULONG Reserved1:1;
@@ -1189,9 +1246,9 @@ typedef union _SDHC_CAPABILITIES_REGISTER {
         ULONG SlotType:2;
     };
     ULONG AsUlong;
-} SDHC_CAPABILITIES_REGISTER, *PSDHC_CAPABILITIES_REGISTER;
+};
 
-typedef union _SDHC_CAPABILITIES2_REGISTER {
+union SDHC_CAPABILITIES2_REGISTER {
    struct {
         ULONG SDR50Support:1;
         ULONG SDR104Support:1;
@@ -1209,7 +1266,7 @@ typedef union _SDHC_CAPABILITIES2_REGISTER {
         ULONG Reserved4:8;
     };
     ULONG AsUlong;
-} SDHC_CAPABILITIES2_REGISTER, *PSDHC_CAPABILITIES2_REGISTER;
+};
 
 // ---------------------------------------------------------------------------
 //
@@ -1248,7 +1305,7 @@ typedef union _SDHC_CAPABILITIES2_REGISTER {
 // Layout of a descriptor (excluding the Address field)
 //
 
-typedef union _SDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY {
+union SDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY {
     struct {
         ULONG Attribute:3;
         ULONG Reserved1:1;
@@ -1257,7 +1314,7 @@ typedef union _SDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY {
         ULONG Length:16;
     };
     ULONG AsUlong;
-} SDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY, *PSDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY;
+};
 
 #pragma pack()
 
@@ -1265,7 +1322,7 @@ typedef union _SDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY {
 // Voltage profile
 // 
 
-typedef union _SDHC_VOLTAGE_PROFILE {
+union SDHC_VOLTAGE_PROFILE {
     struct {
         ULONG Reserved1 : 7;
         ULONG VoltageLow : 1;
@@ -1287,9 +1344,9 @@ typedef union _SDHC_VOLTAGE_PROFILE {
         ULONG Voltage35 : 1;
     };
     ULONG AsUlong;
-} SDHC_VOLTAGE_PROFILE, *PSDHC_VOLTAGE_PROFILE;
+};
 
-typedef enum _SDHC_SPEED_MODE {
+enum SDHC_SPEED_MODE {
     SdhcSpeedModeNormal = 0,
     SdhcSpeedModeHigh,
     SdhcSpeedModeSDR50,
@@ -1297,11 +1354,11 @@ typedef enum _SDHC_SPEED_MODE {
     SdhcSpeedModeSDR104,
     SdhcSpeedModeHS200,
     SdhcSpeedModeHS400
-} SDHC_SPEED_MODE;
+};
 
 #define SDHC_MAX_OUTSTANDING_REQUESTS 1
 
-typedef struct _SDHC_EXTENSION {
+struct SDHC_EXTENSION {
 
     BOOLEAN Removable;
 
@@ -1310,9 +1367,9 @@ typedef struct _SDHC_EXTENSION {
     //
 
     PHYSICAL_ADDRESS PhysicalBaseAddress;
-    PVOID BaseAddress;
+    void* BaseAddress;
     SIZE_T BaseAddressSpaceSize;
-    PSD_HOST_CONTROLLER_REGISTERS BaseAddressDebug;
+    SD_HOST_CONTROLLER_REGISTERS* BaseAddressDebug;
 
     //
     // Capabilities.
@@ -1326,7 +1383,7 @@ typedef struct _SDHC_EXTENSION {
     // Requests to handle.
     //
 
-    PSDPORT_REQUEST OutstandingRequests[SDHC_MAX_OUTSTANDING_REQUESTS];
+    SDPORT_REQUEST* OutstandingRequests[SDHC_MAX_OUTSTANDING_REQUESTS];
     USHORT UnhandledEvents;
 
     //
@@ -1335,7 +1392,7 @@ typedef struct _SDHC_EXTENSION {
 
     BOOLEAN CrashdumpMode;
       
-} SDHC_EXTENSION, *PSDHC_EXTENSION;
+};
 
 // ---------------------------------------------------------------------------
 // PCI Config definitions
@@ -1354,17 +1411,17 @@ SDPORT_GET_SLOT_COUNT SdhcGetSlotCount;
 /*
 NTSTATUS
 SdhcGetSlotCount(
-    _In_ PVOID Argument,
+    _In_ void* Argument,
     _In_ SDPORT_BUS_TYPE BusType
     );
 */
 
 SDPORT_GET_SLOT_CAPABILITIES SdhcGetSlotCapabilities;
 /*
-VOID
+void
 SdhcGetSlotCapabilities(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension,
-    _Inout_ PSDPORT_CAPABILITIES Capabilities
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension,
+    _Inout_ SDPORT_CAPABILITIES* Capabilities
     );
 */
 
@@ -1372,7 +1429,7 @@ SDPORT_INITIALIZE SdhcSlotInitialize;
 /*
 NTSTATUS
 SdhcSlotInitialize(
-    _Inout_ PSDPORT_SLOT_EXTENSION SlotExtension
+    _Inout_ SDPORT_SLOT_EXTENSION* SlotExtension
     );
 */
 
@@ -1380,8 +1437,8 @@ SDPORT_ISSUE_BUS_OPERATION SdhcSlotIssueBusOperation;
 /*
 NTSTATUS
 SdhcSlotIssueBusOperation(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension,
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension,
+    _In_ SDPORT_REQUEST* Request
     );
 */
 
@@ -1389,7 +1446,7 @@ SDPORT_GET_CARD_DETECT_STATE SdhcSlotGetCardDetectState;
 /*
 BOOLEAN
 SdhcSlotGetCardDetectState(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension
     );
 */
 
@@ -1397,7 +1454,7 @@ SDPORT_GET_WRITE_PROTECT_STATE SdhcSlotGetWriteProtectState;
 /*
 BOOLEAN
 SdhcSlotGetWriteProtectState(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension
     );
 */
 
@@ -1405,12 +1462,12 @@ SDPORT_INTERRUPT SdhcSlotInterrupt;
 /*
 BOOLEAN
 SdhcSlotInterrupt(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension,
-    _Out_ PULONG Events,
-	_Out_ PULONG Errors,
-    _Out_ PBOOLEAN NotifyCardChange,
-    _Out_ PBOOLEAN NotifySdioInterrupt,
-    _Out_ PBOOLEAN NotifyTuning
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension,
+    _Out_ ULONG* Events,
+	_Out_ ULONG* Errors,
+    _Out_ BOOLEAN* NotifyCardChange,
+    _Out_ BOOLEAN* NotifySdioInterrupt,
+    _Out_ BOOLEAN* NotifyTuning
     );
 */
 
@@ -1418,26 +1475,26 @@ SDPORT_ISSUE_REQUEST SdhcSlotIssueRequest;
 /*
 NTSTATUS
 SdhcSlotIssueRequest(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension, 
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension, 
+    _In_ SDPORT_REQUEST* Request
     );
 */
 
 SDPORT_GET_RESPONSE SdhcSlotGetResponse;
 /*
-VOID
+void
 SdhcSlotGetResponse(
-    _In_ PVOID PrivateExtension,
-    _In_ PSDPORT_COMMAND Command,
-    _Out_ PVOID ResponseBuffer
+    _In_ void* PrivateExtension,
+    _In_ SDPORT_COMMAND* Command,
+    _Out_ void* ResponseBuffer
     );
 */
 
 SDPORT_TOGGLE_EVENTS SdhcSlotToggleEvents;
 /*
-VOID
+void
 SdhcSlotToggleEevnts(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension,
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension,
     _In_ ULONG EventMask,
     _In_ BOOLEAN Enable,
     _In_ BOOLEAN CrashdumpMode
@@ -1446,19 +1503,19 @@ SdhcSlotToggleEevnts(
 
 SDPORT_CLEAR_EVENTS SdhcSlotClearEvents;
 /*
-VOID
+void
 SdhcSlotClearEvents(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension,
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension,
     _In_ ULONG EventMask
     );
 */
 
 SDPORT_REQUEST_DPC SdhcRequestDpc;
 /*
-VOID
+void
 SdhcRequestDpc(
-    _In_ PVOID PrivateExtension,
-    _Inout_ PSDPORT_REQUEST Request,
+    _In_ void* PrivateExtension,
+    _Inout_ SDPORT_REQUEST* Request,
     _In_ ULONG Events,
     _In_ ULONG Errors
     );
@@ -1466,17 +1523,17 @@ SdhcRequestDpc(
 
 SDPORT_SAVE_CONTEXT SdhcSaveContext;
 /*
-VOID
+void
 SdhcSaveContext(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension
     );
 */
 
 SDPORT_RESTORE_CONTEXT SdhcRestoreContext;
 /*
-VOID
+void
 SdhcRestoreContext(
-    _In_ PSDPORT_SLOT_EXTENSION SlotExtension
+    _In_ SDPORT_SLOT_EXTENSION* SlotExtension
     );
 */
 
@@ -1484,21 +1541,21 @@ SDPORT_PO_FX_POWER_CONTROL_CALLBACK SdhcPoFxPowerControlCallback;
 /*
 NTSTATUS
 SdhcPoFxPowerControlCallback(
-    _In_ PSD_MINIPORT Miniport,
-    _In_ LPCGUID PowerControlCode,
-    _In_reads_bytes_opt_(InputBufferSize) PVOID InputBuffer,
+    _In_ SD_MINIPORT* Miniport,
+    _In_ GUID const* PowerControlCode,
+    _In_reads_bytes_opt_(InputBufferSize) void* InputBuffer,
     _In_ SIZE_T InputBufferSize,
-    _Out_writes_bytes_opt_(OutputBufferSize) PVOID OutputBuffer,
+    _Out_writes_bytes_opt_(OutputBufferSize) void* OutputBuffer,
     _In_ SIZE_T OutputBufferSize,
-    _Out_opt_ PSIZE_T BytesReturned
+    _Out_opt_ SIZE_T* BytesReturned
     )
 */
 
 SDPORT_CLEANUP SdhcCleanup;
 /*
-VOID
+void
 SdhcCleanup(
-    _In_ PSD_MINIPORT Miniport
+    _In_ SD_MINIPORT* Miniport
     )
 */
 
@@ -1509,214 +1566,214 @@ SdhcCleanup(
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcResetHost(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ SDPORT_RESET_TYPE ResetType
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetVoltage(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ SDPORT_BUS_VOLTAGE VoltageProfile
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetClock(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Frequency
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetBusWidth(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ SDPORT_BUS_WIDTH BusWidth
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetSpeed(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ SDPORT_BUS_SPEED Speed
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetHighSpeed(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetUhsMode(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ USHORT Mode
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetSignaling(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcExecuteTuning(
-    _In_ PSDHC_EXTENSION SdhcExtension
+    _In_ SDHC_EXTENSION* SdhcExtension
     );
 
-VOID
+void
 SdhcSetLed(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetPresetValue(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
     );
 
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcEnableBlockGapInterrupt(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
     );
 
-VOID
+void
 SdhcSetBlockGapControl(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Continue,
     _In_ BOOLEAN RequestStop
     );
 
-VOID
+void
 SdhcSetBlockGapControl(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Continue,
     _In_ BOOLEAN RequestStop
     );
 
-VOID
+void
 SdhcEnableInterrupt(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG NormalMask
     );
 
-VOID
+void
 SdhcDisableInterrupt(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG NormalMask
     );
 
 USHORT
 SdhcGetInterruptStatus(
-    _In_ PSDHC_EXTENSION SdhcExtension
+    _In_ SDHC_EXTENSION* SdhcExtension
     );
 
 USHORT
 SdhcGetErrorStatus(
-    _In_ PSDHC_EXTENSION SdhcExtension
+    _In_ SDHC_EXTENSION* SdhcExtension
     );
 
 USHORT
 SdhcGetAutoCmd12ErrorStatus(
-    _In_ PSDHC_EXTENSION SdhcExtension
+    _In_ SDHC_EXTENSION* SdhcExtension
     );
 
 USHORT
 SdhcGetAdmaErrorStatus(
-    _In_ PSDHC_EXTENSION SdhcExtension
+    _In_ SDHC_EXTENSION* SdhcExtension
     );
 
-VOID
+void
 SdhcAcknowledgeInterrupts(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ USHORT Interrupts
     );
 
 BOOLEAN
 SdhcIsCardInserted(
-    _In_ PSDHC_EXTENSION SdhcExtension
+    _In_ SDHC_EXTENSION* SdhcExtension
     );
 
 BOOLEAN
 SdhcIsWriteProtected(
-    _In_ PSDHC_EXTENSION SdhcExtension
+    _In_ SDHC_EXTENSION* SdhcExtension
     );
 
 NTSTATUS
 SdhcSendCommand(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
     );
 
 NTSTATUS
 SdhcGetResponse(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_COMMAND Command,
-    _Out_ PVOID ResponseBuffer
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_COMMAND* Command,
+    _Out_ void* ResponseBuffer
     );
 
 NTSTATUS
 SdhcSetTransferMode(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
     );
 
-VOID
+void
 SdhcReadDataPort(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _Out_writes_all_(Length) PUCHAR Buffer,
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _Out_writes_all_(Length) UCHAR* Buffer,
     _In_ SIZE_T Length
     );
 
-VOID
+void
 SdhcWriteDataPort(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_reads_(Length) PUCHAR Buffer,
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_reads_(Length) UCHAR* Buffer,
     _In_ ULONG Length
     );
 
 NTSTATUS
 SdhcBuildTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
     );
 
 NTSTATUS
 SdhcStartTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
     );
 
 NTSTATUS
 SdhcBuildPioTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
     );
 
 NTSTATUS
 SdhcBuildAdmaTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
     );
 
 NTSTATUS
 SdhcStartPioTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
     );
 
 NTSTATUS
 SdhcStartAdmaTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
     );
 
 //-----------------------------------------------------------------------------
@@ -1725,9 +1782,9 @@ SdhcStartAdmaTransfer(
 
 USHORT
 SdhcCalcClockFrequency(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG TargetFrequency,
-    _Out_ PULONG ActualFrequency
+    _Out_ ULONG* ActualFrequency
     );
 
 USHORT
@@ -1742,14 +1799,14 @@ SdhcConvertErrorToStatus(
 
 NTSTATUS
 SdhcCreateAdmaDescriptorTable(
-    _In_ PSDPORT_REQUEST Request,
+    _In_ SDPORT_REQUEST* Request,
     _In_ BOOLEAN Use64BitDescriptor,
-    _Out_ PULONG TotalTransferLength
+    _Out_ ULONG* TotalTransferLength
     );
 
-VOID
+void
 SdhcInitializePciConfigSpace(
-    _In_ PSD_MINIPORT Miniport
+    _In_ SD_MINIPORT* Miniport
     );
 
 __forceinline
@@ -1858,9 +1915,9 @@ SdhcConvertErrorToStatus(
 //-----------------------------------------------------------------------------
 
 __forceinline
-VOID
+void
 SdhcWriteRegisterUlong(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register,
     _In_ ULONG Data
     )
@@ -1872,9 +1929,9 @@ SdhcWriteRegisterUlong(
 }
 
 __forceinline
-VOID
+void
 SdhcWriteRegisterUshort(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register,
     _In_ USHORT Data
     )
@@ -1886,9 +1943,9 @@ SdhcWriteRegisterUshort(
 }
 
 __forceinline
-VOID
+void
 SdhcWriteRegisterUchar(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register,
     _In_ UCHAR Data
     )
@@ -1902,7 +1959,7 @@ SdhcWriteRegisterUchar(
 __forceinline
 ULONG
 SdhcReadRegisterUlong(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register
     )
 
@@ -1913,7 +1970,7 @@ SdhcReadRegisterUlong(
 __forceinline
 USHORT
 SdhcReadRegisterUshort(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register
     )
 
@@ -1924,7 +1981,7 @@ SdhcReadRegisterUshort(
 __forceinline
 UCHAR
 SdhcReadRegisterUchar(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register
     )
 
@@ -1933,11 +1990,11 @@ SdhcReadRegisterUchar(
 }
 
 __forceinline
-VOID
+void
 SdhcReadRegisterBufferUlong(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register,
-    _Out_writes_all_(Length) PULONG Buffer,
+    _Out_writes_all_(Length) ULONG* Buffer,
     _In_ ULONG Length)
 
 {
@@ -1948,11 +2005,11 @@ SdhcReadRegisterBufferUlong(
 }
 
 __forceinline
-VOID
+void
 SdhcReadRegisterBufferUshort(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register,
-    _Out_writes_all_(Length) PUSHORT Buffer,
+    _Out_writes_all_(Length) USHORT* Buffer,
     _In_ ULONG Length)
 
 {
@@ -1963,11 +2020,11 @@ SdhcReadRegisterBufferUshort(
 }
 
 __forceinline
-VOID
+void
 SdhcReadRegisterBufferUchar(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register,
-    _Out_writes_all_(Length) PUCHAR Buffer,
+    _Out_writes_all_(Length) UCHAR* Buffer,
     _In_ ULONG Length)
 
 {
@@ -1978,11 +2035,11 @@ SdhcReadRegisterBufferUchar(
 }
 
 __forceinline
-VOID
+void
 SdhcWriteRegisterBufferUlong(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register,
-    _In_reads_(Length) PULONG Buffer,
+    _In_reads_(Length) ULONG* Buffer,
     _In_ ULONG Length
     )
 
@@ -1995,11 +2052,11 @@ SdhcWriteRegisterBufferUlong(
 }
 
 __forceinline
-VOID
+void
 SdhcWriteRegisterBufferUshort(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register,
-    _In_reads_(Length) PUSHORT Buffer,
+    _In_reads_(Length) USHORT* Buffer,
     _In_ ULONG Length
     )
 
@@ -2012,11 +2069,11 @@ SdhcWriteRegisterBufferUshort(
 }
 
 __forceinline
-VOID
+void
 SdhcWriteRegisterBufferUchar(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Register,
-    _In_reads_(Length) PUCHAR Buffer,
+    _In_reads_(Length) UCHAR* Buffer,
     _In_ ULONG Length
     )
 
@@ -2032,7 +2089,7 @@ SdhcWriteRegisterBufferUchar(
 __forceinline
 UCHAR
 SdhcGetResponseLength(
-    _In_ PSDPORT_COMMAND Command
+    _In_ SDPORT_COMMAND* Command
     )
 
 /*++
@@ -2084,7 +2141,3 @@ Return value:
 
     return Length;
 }
-
-#define MIN(x,y) ((x) > (y) ? (y) : (x))        // return minimum among x & y
-#define MAX(x,y) ((x) > (y) ? (x) : (y))        // return maximum among x & y
-#define DIV_CEIL(x, y) (((x) + (y) - 1) / (y))

@@ -1,0 +1,35 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31112.23
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SDHostBRCME88C", "..\..\drivers\sd\bcm2711\brcme88c\SDHostBRCME88C.vcxproj", "{DC75D1FD-24D8-462B-8566-5E672802DDF3}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|ARM = Debug|ARM
+		Debug|ARM64 = Debug|ARM64
+		Release|ARM = Release|ARM
+		Release|ARM64 = Release|ARM64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Debug|ARM.ActiveCfg = Debug|ARM
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Debug|ARM.Build.0 = Debug|ARM
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Debug|ARM.Deploy.0 = Debug|ARM
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Debug|ARM64.Build.0 = Debug|ARM64
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Release|ARM.ActiveCfg = Release|ARM
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Release|ARM.Build.0 = Release|ARM
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Release|ARM.Deploy.0 = Release|ARM
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Release|ARM64.ActiveCfg = Release|ARM64
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Release|ARM64.Build.0 = Release|ARM64
+		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Release|ARM64.Deploy.0 = Release|ARM64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {8BF48D2F-8472-4C8E-A37D-D0B30EDE788F}
+	EndGlobalSection
+EndGlobal

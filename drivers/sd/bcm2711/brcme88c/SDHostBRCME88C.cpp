@@ -1,15 +1,32 @@
 // Adapted from sample code: Copyright (c) Microsoft Corporation
 // https://github.com/microsoft/Windows-driver-samples/tree/master/sd/miniport/sdhc
 
-#include <ntddk.h>
+#include <wdm.h>
+#include <TraceLoggingProvider.h>
+#include <evntrace.h>
 extern "C" {
-    #include <sdport.h>
+#include <sdport.h>
 }
+
 #include "SDHostBRCME88C.h"
 
-#ifdef ALLOC_PRAGMA
-    #pragma alloc_text(INIT, DriverEntry)
-#endif
+TRACELOGGING_DEFINE_PROVIDER(
+    g_trace,
+    "SDHostBRCME88C",
+    // *SDHostBRCME88C = {f2782ab9-d1a5-5f95-240a-ac933a6937e2}
+    (0xf2782ab9, 0xd1a5, 0x5f95, 0x24, 0x0a, 0xac, 0x93, 0x3a, 0x69, 0x37, 0xe2));
+
+__forceinline constexpr ULONG
+Min(ULONG x, ULONG y)
+{
+    return x < y ? x : y;
+}
+
+__forceinline constexpr ULONG
+Max(ULONG x, ULONG y)
+{
+    return x < y ? y : x;
+}
 
 //-----------------------------------------------------------------------------
 // SlotExtension routines.
@@ -20,38 +37,13 @@ extern "C"
 NTSTATUS
 __declspec(code_seg("INIT"))
 DriverEntry(
-    _In_ struct _DRIVER_OBJECT *DriverObject,
-    _In_ PUNICODE_STRING RegistryPath
-    )
-
-/*++
-
-Routine Description:
-
-    This routine is the entry point for the standard sdhsot miniport driver.
-
-Arguments:
-
-    DriverObject - DriverObject for the standard host controller.
-
-    RegistryPath - Registry path for this standard host controller.
-
-Return Value:
-
-    NTSTATUS
-
---*/
-
+    _In_ DRIVER_OBJECT* DriverObject,
+    _In_ UNICODE_STRING* RegistryPath)
 {
-
     SDPORT_INITIALIZATION_DATA InitializationData;
 
     RtlZeroMemory(&InitializationData, sizeof(InitializationData));
     InitializationData.StructureSize = sizeof(InitializationData);
-
-    //
-    // Initialize the entry points/callbacks for the miniport interface.
-    //
 
     InitializationData.GetSlotCount = SdhcGetSlotCount;
     InitializationData.GetSlotCapabilities = SdhcGetSlotCapabilities;
@@ -70,25 +62,55 @@ Return Value:
     InitializationData.PowerControlCallback = SdhcPoFxPowerControlCallback;
     InitializationData.Cleanup = SdhcCleanup;
 
-    //
-    // Provide the number of slots and their size.
-    //
-
     InitializationData.PrivateExtensionSize = sizeof(SDHC_EXTENSION);
     InitializationData.CrashdumpSupported = TRUE;
 
-    //
-    // Hook up the IRP dispatch routines.
-    //
-    
-    return SdPortInitialize(DriverObject, RegistryPath, &InitializationData);
+    NTSTATUS Status = SdPortInitialize(DriverObject, RegistryPath, &InitializationData);
+
+    TraceLoggingRegister(g_trace);
+
+    LogInfo("DriverEntry", TraceLoggingNTStatus(Status));
+
+    if (!NT_SUCCESS(Status))
+    {
+        TraceLoggingUnregister(g_trace);
+    }
+
+    return Status;
+}
+
+void
+SdhcCleanup(
+    _In_ SD_MINIPORT* Miniport
+)
+
+/*++
+
+Routine Description:
+
+    Cleanup any memory allocations done during the lifetime of the driver.
+
+Arguments:
+
+    Miniport - Miniport interface for the controller.
+
+Return value:
+
+    NTSTATUS
+
+--*/
+
+{
+    UNREFERENCED_PARAMETER(Miniport);
+    LogInfo("Cleanup");
+    TraceLoggingUnregister(g_trace);
 }
 
 NTSTATUS
 SdhcGetSlotCount(
-    _In_ PSD_MINIPORT Miniport,
-    _Out_ PUCHAR SlotCount
-    )
+    _In_ SD_MINIPORT* Miniport,
+    _Out_ UCHAR* SlotCount
+)
 
 /*++
 
@@ -132,10 +154,10 @@ Return value:
 
     case SdBusTypePci:
         Data = 0;
-        Status = SdPortGetPciConfigSpace(Miniport, 
-                                         SDHC_PCICFG_SLOT_INFORMATION,
-                                         &Data,
-                                         sizeof(Data));
+        Status = SdPortGetPciConfigSpace(Miniport,
+            SDHC_PCICFG_SLOT_INFORMATION,
+            &Data,
+            sizeof(Data));
 
         if (!NT_SUCCESS(Status)) {
             return Status;
@@ -165,11 +187,11 @@ Return value:
     return Status;
 }
 
-VOID
+void
 SdhcGetSlotCapabilities(
-    _In_ PVOID PrivateExtension,
-    _Out_ PSDPORT_CAPABILITIES Capabilities
-    )
+    _In_ void* PrivateExtension,
+    _Out_ SDPORT_CAPABILITIES* Capabilities
+)
 
 /*++
 
@@ -192,22 +214,22 @@ Return value:
 
 {
 
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
 
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
-    RtlCopyMemory(Capabilities, 
-                  &SdhcExtension->Capabilities,
-                  sizeof(SdhcExtension->Capabilities));
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
+    RtlCopyMemory(Capabilities,
+        &SdhcExtension->Capabilities,
+        sizeof(SdhcExtension->Capabilities));
 }
 
 NTSTATUS
 SdhcSlotInitialize(
-    _In_ PVOID PrivateExtension,
+    _In_ void* PrivateExtension,
     _In_ PHYSICAL_ADDRESS PhysicalBase,
-    _In_ PVOID VirtualBase,
+    _In_ void* VirtualBase,
     _In_ ULONG Length,
     _In_ BOOLEAN CrashdumpMode
-    )
+)
 
 /*++
 
@@ -234,8 +256,7 @@ Return value:
 --*/
 
 {
-
-    PSDPORT_CAPABILITIES Capabilities;
+    SDPORT_CAPABILITIES* Capabilities;
     SDHC_CAPABILITIES_REGISTER CapabilitiesReg;
     SDHC_CAPABILITIES2_REGISTER Capabilities2Reg;
     ULONG CurrentLimits;
@@ -243,10 +264,10 @@ Return value:
     ULONG CurrentLimitMask;
     ULONG CurrentLimitShift;
     UCHAR Index;
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
     USHORT SpecVersion;
 
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
 
     //
     // Initialize the SDHC_EXTENSION register space.
@@ -255,8 +276,8 @@ Return value:
     SdhcExtension->PhysicalBaseAddress = PhysicalBase;
     SdhcExtension->BaseAddress = VirtualBase;
     SdhcExtension->BaseAddressSpaceSize = Length;
-    SdhcExtension->BaseAddressDebug = 
-        (PSD_HOST_CONTROLLER_REGISTERS) VirtualBase;
+    SdhcExtension->BaseAddressDebug =
+        (SD_HOST_CONTROLLER_REGISTERS*)VirtualBase;
 
     //
     // Check whether the driver is in crashdump mode.
@@ -268,12 +289,17 @@ Return value:
     // Initialize host capabilities.
     //
 
-    Capabilities = (PSDPORT_CAPABILITIES) &SdhcExtension->Capabilities;
+    Capabilities = (SDPORT_CAPABILITIES*)&SdhcExtension->Capabilities;
     CapabilitiesReg.AsUlong =
         SdhcReadRegisterUlong(SdhcExtension, SDHC_CAPABILITIES);
 
     Capabilities2Reg.AsUlong =
         SdhcReadRegisterUlong(SdhcExtension, SDHC_CAPABILITIES2);
+
+    // BRCME88C capabilities register is not accurate.
+    CapabilitiesReg.Adma2Support = 0;
+    CapabilitiesReg.DmaSupport = 0;
+    Capabilities2Reg.DDR50Support = 0;
 
     SpecVersion = SdhcReadRegisterUshort(SdhcExtension, SDHC_VERSION);
     Capabilities->SpecVersion = SpecVersion & 0xFF;
@@ -288,10 +314,10 @@ Return value:
     Capabilities->DmaDescriptorSize =
         sizeof(SDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY) +
         (CapabilitiesReg.SystemBus64Support ?
-        sizeof(ULONGLONG) : sizeof(ULONG));
+            sizeof(ULONGLONG) : sizeof(ULONG));
 
-    Capabilities->AlignmentRequirement = 
-        (CapabilitiesReg.SystemBus64Support ? 
+    Capabilities->AlignmentRequirement =
+        (CapabilitiesReg.SystemBus64Support ?
             sizeof(ULONGLONG) : sizeof(ULONG)) - 1;
 
     //
@@ -391,17 +417,19 @@ Return value:
         CurrentLimitMask = 0xFF;
         CurrentLimitShift = 0;
 
-    } else if (Capabilities->Supported.Voltage30V) {
+    }
+    else if (Capabilities->Supported.Voltage30V) {
         CurrentLimitMask = 0xFF00;
         CurrentLimitShift = 8;
 
-    } else if (Capabilities->Supported.Voltage18V) {
+    }
+    else if (Capabilities->Supported.Voltage18V) {
         CurrentLimitMask = 0xFF0000;
         CurrentLimitShift = 16;
     }
 
     CurrentLimits = SdhcReadRegisterUlong(SdhcExtension, SDHC_MAXIMUM_CURRENT);
-    CurrentLimitMax = 
+    CurrentLimitMax =
         ((CurrentLimits & CurrentLimitMask) >> CurrentLimitShift) * 4;
 
     if (CurrentLimitMax >= 800) {
@@ -425,12 +453,12 @@ Return value:
     // of what operations are in flight.
     //
 
-    for (Index = 0; 
-         Index < Capabilities->MaximumOutstandingRequests;
-         Index += 1) {
+    for (Index = 0;
+        Index < Capabilities->MaximumOutstandingRequests;
+        Index += 1) {
 
-        RtlZeroMemory(&SdhcExtension->OutstandingRequests[Index], 
-                      sizeof(PSDPORT_REQUEST));
+        RtlZeroMemory(&SdhcExtension->OutstandingRequests[Index],
+            sizeof(SDPORT_REQUEST*));
     }
 
     return STATUS_SUCCESS;
@@ -439,9 +467,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSlotIssueBusOperation(
-    _In_ PVOID PrivateExtension,
-    _In_ PSDPORT_BUS_OPERATION BusOperation
-    )
+    _In_ void* PrivateExtension,
+    _In_ SDPORT_BUS_OPERATION* BusOperation
+)
 
 /*++
 
@@ -462,34 +490,33 @@ Return value:
 --*/
 
 {
-
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
     NTSTATUS Status;
 
     Status = STATUS_INVALID_PARAMETER;
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
     switch (BusOperation->Type) {
     case SdResetHost:
-        Status = SdhcResetHost(SdhcExtension, 
-                               BusOperation->Parameters.ResetType);
+        Status = SdhcResetHost(SdhcExtension,
+            BusOperation->Parameters.ResetType);
 
         break;
 
     case SdSetClock:
         Status = SdhcSetClock(SdhcExtension,
-                              BusOperation->Parameters.FrequencyKhz);
+            BusOperation->Parameters.FrequencyKhz);
 
         break;
 
     case SdSetVoltage:
         Status = SdhcSetVoltage(SdhcExtension,
-                                BusOperation->Parameters.Voltage);
+            BusOperation->Parameters.Voltage);
 
         break;
 
     case SdSetBusWidth:
         Status = SdhcSetBusWidth(SdhcExtension,
-                                 BusOperation->Parameters.BusWidth);
+            BusOperation->Parameters.BusWidth);
 
         break;
 
@@ -498,11 +525,11 @@ Return value:
         break;
 
     case SdSetSignalingVoltage:
-        Status = 
+        Status =
             SdhcSetSignaling(
-                SdhcExtension, 
-                (BOOLEAN)(BusOperation->Parameters.SignalingVoltage == 
-                          SdSignalingVoltage18));
+                SdhcExtension,
+                (BOOLEAN)(BusOperation->Parameters.SignalingVoltage ==
+                    SdSignalingVoltage18));
 
         break;
 
@@ -519,15 +546,15 @@ Return value:
 
     case SdSetPresetValue:
         Status = SdhcSetPresetValue(
-                    SdhcExtension,
-                    BusOperation->Parameters.PresetValueEnabled);
+            SdhcExtension,
+            BusOperation->Parameters.PresetValueEnabled);
 
         break;
 
     case SdSetBlockGapInterrupt:
         Status = SdhcEnableBlockGapInterrupt(
-                    SdhcExtension,
-                    BusOperation->Parameters.BlockGapIntEnabled);
+            SdhcExtension,
+            BusOperation->Parameters.BlockGapIntEnabled);
 
         break;
 
@@ -537,16 +564,20 @@ Return value:
 
     default:
         Status = STATUS_INVALID_PARAMETER;
-        break; 
+        break;
     }
 
+    LogInfo("IssueBusOperation",
+        TraceLoggingUInt32(BusOperation->Type, "Type"),
+        TraceLoggingHexInt32(BusOperation->Parameters.FrequencyKhz, "Parameters"),
+        TraceLoggingNTStatus(Status));
     return Status;
 }
 
 BOOLEAN
 SdhcSlotGetCardDetectState(
-    _In_ PVOID PrivateExtension
-    )
+    _In_ void* PrivateExtension
+)
 
 /*++
 
@@ -568,16 +599,16 @@ Return value:
 
 {
 
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
 
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
     return SdhcIsCardInserted(SdhcExtension);
 }
 
 BOOLEAN
 SdhcSlotGetWriteProtectState(
-    _In_ PVOID PrivateExtension
-    )
+    _In_ void* PrivateExtension
+)
 
 /*++
 
@@ -599,21 +630,21 @@ Return value:
 
 {
 
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
 
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
     return SdhcIsWriteProtected(SdhcExtension);
 }
 
 BOOLEAN
 SdhcSlotInterrupt(
-    _In_ PVOID PrivateExtension,
-    _Out_ PULONG Events,
-    _Out_ PULONG Errors,
-    _Out_ PBOOLEAN CardChange,
-    _Out_ PBOOLEAN SdioInterrupt,
-    _Out_ PBOOLEAN Tuning
-    )
+    _In_ void* PrivateExtension,
+    _Out_ ULONG* Events,
+    _Out_ ULONG* Errors,
+    _Out_ BOOLEAN* CardChange,
+    _Out_ BOOLEAN* SdioInterrupt,
+    _Out_ BOOLEAN* Tuning
+)
 
 /*++
 
@@ -633,10 +664,10 @@ Return value:
 
 {
 
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
 
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
-    *Events = (ULONG) SdhcGetInterruptStatus(SdhcExtension);
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
+    *Events = (ULONG)SdhcGetInterruptStatus(SdhcExtension);
     *Errors = 0;
     *CardChange = 0;
     *SdioInterrupt = 0;
@@ -652,7 +683,7 @@ Return value:
     }
 
     if (*Events & SDHC_IS_ERROR_INTERRUPT) {
-        *Errors = (ULONG) SdhcGetErrorStatus(SdhcExtension);
+        *Errors = (ULONG)SdhcGetErrorStatus(SdhcExtension);
     }
 
     //
@@ -666,9 +697,9 @@ Return value:
     //
     // If we have an external SDIO interrupt, notify the port driver.
     //
-    
+
     if (*Events & SDHC_IS_CARD_INTERRUPT) {
-        *SdioInterrupt = TRUE; 
+        *SdioInterrupt = TRUE;
     }
 
     //
@@ -686,19 +717,19 @@ Return value:
     // See how Storport does this (if it does).
     //
 
-    SdhcAcknowledgeInterrupts(SdhcExtension, (USHORT) *Events);
+    SdhcAcknowledgeInterrupts(SdhcExtension, (USHORT)*Events);
     *Events &= ~(SDHC_IS_CARD_DETECT |
-                 SDHC_IS_CARD_INTERRUPT |
-                 SDHC_IS_TUNING_INTERRUPT);
+        SDHC_IS_CARD_INTERRUPT |
+        SDHC_IS_TUNING_INTERRUPT);
 
     return (*Events != 0) || (*CardChange) || (*SdioInterrupt) || (*Tuning);
 }
 
 NTSTATUS
 SdhcSlotIssueRequest(
-    _In_ PVOID PrivateExtension,
-    _In_ PSDPORT_REQUEST Request
-    )
+    _In_ void* PrivateExtension,
+    _In_ SDPORT_REQUEST* Request
+)
 
 /*++
 
@@ -721,18 +752,18 @@ Return value:
 {
 
     ULONG Index;
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
     NTSTATUS Status;
 
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
 
     //
     // Insert the request onto the outstanding requests list.
     //
 
     for (Index = 0;
-         Index < SdhcExtension->Capabilities.MaximumOutstandingRequests;
-         Index += 1) {
+        Index < SdhcExtension->Capabilities.MaximumOutstandingRequests;
+        Index += 1) {
 
         if (SdhcExtension->OutstandingRequests[Index] == NULL) {
             SdhcExtension->OutstandingRequests[Index] = Request;
@@ -762,12 +793,12 @@ Return value:
     return Status;
 }
 
-VOID
+void
 SdhcSlotGetResponse(
-    _In_ PVOID PrivateExtension,
-    _In_ PSDPORT_COMMAND Command,
-    _Out_ PVOID ResponseBuffer
-    )
+    _In_ void* PrivateExtension,
+    _In_ SDPORT_COMMAND* Command,
+    _Out_ void* ResponseBuffer
+)
 
 /*++
 
@@ -791,21 +822,21 @@ Return value:
 
 {
 
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
     NTSTATUS Status;
 
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
     Status = SdhcGetResponse(SdhcExtension, Command, ResponseBuffer);
     NT_ASSERT(NT_SUCCESS(Status));
 }
 
-VOID
+void
 SdhcRequestDpc(
-    _In_ PVOID PrivateExtension,
-    _Inout_ PSDPORT_REQUEST Request,
+    _In_ void* PrivateExtension,
+    _Inout_ SDPORT_REQUEST* Request,
     _In_ ULONG Events,
     _In_ ULONG Errors
-    )
+)
 
 /*++
 
@@ -828,7 +859,7 @@ Return value:
 {
 
     ULONG Index;
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
     NTSTATUS Status;
 
     //
@@ -841,7 +872,7 @@ Return value:
     // Find the index of the request in the outstanding request list.
     //
 
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
     for (Index = 0; Index < SDHC_MAX_OUTSTANDING_REQUESTS; Index += 1) {
         if (SdhcExtension->OutstandingRequests[Index] == Request) {
             break;
@@ -861,10 +892,11 @@ Return value:
     if (Errors) {
         Request->RequiredEvents = 0;
         SdhcExtension->OutstandingRequests[Index] = NULL;
-        Status = SdhcConvertErrorToStatus((USHORT) Errors);
+        Status = SdhcConvertErrorToStatus((USHORT)Errors);
         SdPortCompleteRequest(Request, Status);
 
-    } else if (Request->RequiredEvents == 0) {
+    }
+    else if (Request->RequiredEvents == 0) {
         if (Request->Status != STATUS_MORE_PROCESSING_REQUIRED) {
             Request->Status = STATUS_SUCCESS;
         }
@@ -874,12 +906,12 @@ Return value:
     }
 }
 
-VOID
+void
 SdhcSlotToggleEvents(
-    _In_ PVOID PrivateExtension,
+    _In_ void* PrivateExtension,
     _In_ ULONG EventMask,
     _In_ BOOLEAN Enable
-    )
+)
 
 /*++
 
@@ -902,42 +934,46 @@ Return value:
 --*/
 
 {
-
     USHORT InterruptMask;
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
+
+    LogInfo("ToggleEvents",
+        TraceLoggingBoolean(Enable),
+        TraceLoggingHexInt32(EventMask));
 
     InterruptMask = SdhcConvertEventsToHwMask(EventMask);
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
     if (Enable) {
-        SdhcEnableInterrupt(SdhcExtension, 
-                            InterruptMask);
+        SdhcEnableInterrupt(SdhcExtension,
+            InterruptMask);
 
-    } else {
-        SdhcDisableInterrupt(SdhcExtension, 
-                             InterruptMask);
+    }
+    else {
+        SdhcDisableInterrupt(SdhcExtension,
+            InterruptMask);
     }
 }
 
-VOID
+void
 SdhcSlotClearEvents(
-    _In_ PVOID PrivateExtension,
+    _In_ void* PrivateExtension,
     _In_ ULONG EventMask
-    )
+)
 
 {
 
     USHORT Interrupts;
-    PSDHC_EXTENSION SdhcExtension;
+    SDHC_EXTENSION* SdhcExtension;
 
-    SdhcExtension = (PSDHC_EXTENSION) PrivateExtension;
+    SdhcExtension = (SDHC_EXTENSION*)PrivateExtension;
     Interrupts = SdhcConvertEventsToHwMask(EventMask);
     SdhcAcknowledgeInterrupts(SdhcExtension, Interrupts);
 }
 
-VOID
+void
 SdhcSaveContext(
-    _In_ PVOID PrivateExtension
-    )
+    _In_ void* PrivateExtension
+)
 
 /*++
 
@@ -959,10 +995,10 @@ Return value:
     UNREFERENCED_PARAMETER(PrivateExtension);
 }
 
-VOID
+void
 SdhcRestoreContext(
-    _In_ PVOID PrivateExtension
-    )
+    _In_ void* PrivateExtension
+)
 
 /*++
 
@@ -986,14 +1022,14 @@ Return value:
 
 NTSTATUS
 SdhcPoFxPowerControlCallback(
-    _In_ PSD_MINIPORT Miniport,
-    _In_ LPCGUID PowerControlCode,
-    _In_reads_bytes_opt_(InputBufferSize) PVOID InputBuffer,
+    _In_ SD_MINIPORT* Miniport,
+    _In_ GUID const* PowerControlCode,
+    _In_reads_bytes_opt_(InputBufferSize) void* InputBuffer,
     _In_ SIZE_T InputBufferSize,
-    _Out_writes_bytes_opt_(OutputBufferSize) PVOID OutputBuffer,
+    _Out_writes_bytes_opt_(OutputBufferSize) void* OutputBuffer,
     _In_ SIZE_T OutputBufferSize,
-    _Out_opt_ PSIZE_T BytesReturned
-    )
+    _Out_opt_ SIZE_T* BytesReturned
+)
 
 /*++
 
@@ -1037,32 +1073,6 @@ Return value:
     return STATUS_NOT_IMPLEMENTED;
 }
 
-VOID
-SdhcCleanup(
-    _In_ PSD_MINIPORT Miniport
-    )
-
-/*++
-
-Routine Description:
-
-    Cleanup any memory allocations done during the lifetime of the driver.
-
-Arguments:
-
-    Miniport - Miniport interface for the controller.
-
-Return value:
-
-    NTSTATUS
-
---*/
-
-{
-
-    UNREFERENCED_PARAMETER(Miniport);
-}
-
 //-----------------------------------------------------------------------------
 // Host routine implementations.
 //-----------------------------------------------------------------------------
@@ -1070,9 +1080,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcResetHost(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ SDPORT_RESET_TYPE ResetType
-    )
+)
 
 /*++
 
@@ -1143,8 +1153,8 @@ Return value:
     //
 
     SdhcWriteRegisterUchar(SdhcExtension,
-                           SDHC_TIMEOUT_CONTROL,
-                           SDHC_TC_MAX_DATA_TIMEOUT);
+        SDHC_TIMEOUT_CONTROL,
+        SDHC_TC_MAX_DATA_TIMEOUT);
 
     //
     // Clear detection interrupt after reset, we will pick up the
@@ -1152,8 +1162,8 @@ Return value:
     //
 
     SdhcWriteRegisterUshort(SdhcExtension,
-                            SDHC_INTERRUPT_STATUS,
-                            0xFFFF);
+        SDHC_INTERRUPT_STATUS,
+        0xFFFF);
 
     //
     // Initialize DMA if the controller supports it.
@@ -1165,7 +1175,8 @@ Return value:
         if (SdhcExtension->Capabilities.Supported.Address64Bit) {
             HostControl |= SDHC_HC_DMA_SELECT_ADMA64;
 
-        } else {
+        }
+        else {
             HostControl |= SDHC_HC_DMA_SELECT_ADMA32;
         }
     }
@@ -1177,9 +1188,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetClock(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG Frequency
-    )
+)
 
 /*++
 
@@ -1208,15 +1219,15 @@ Return value:
     ULONG Delay;
     USHORT Mask;
     UCHAR Retries;
-    
+
     UNREFERENCED_PARAMETER(Frequency);
 
     ClockControl = SdhcReadRegisterUshort(SdhcExtension, SDHC_CLOCK_CONTROL);
     ClockControl &= ~(SDHC_CC_CLOCK_ENABLE | SDHC_CC_INTERNAL_CLOCK_ENABLE);
     SdhcWriteRegisterUshort(SdhcExtension, SDHC_CLOCK_CONTROL, ClockControl);
     ClockControl = SdhcCalcClockFrequency(SdhcExtension,
-                                          Frequency,
-                                          &ActualFrequency);
+        Frequency,
+        &ActualFrequency);
 
     ClockControl |= SDHC_CC_INTERNAL_CLOCK_ENABLE;
     SdhcWriteRegisterUshort(SdhcExtension, SDHC_CLOCK_CONTROL, ClockControl);
@@ -1234,9 +1245,9 @@ Return value:
             return STATUS_IO_TIMEOUT;
         }
 
-        ClockControl = 
+        ClockControl =
             SdhcReadRegisterUshort(SdhcExtension, SDHC_CLOCK_CONTROL);
-        
+
         if ((ClockControl & Mask) == 0) {
             SdPortWait(1000);
         }
@@ -1263,9 +1274,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetVoltage(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ SDPORT_BUS_VOLTAGE Voltage
-    )
+)
 
 /*++
 
@@ -1302,7 +1313,7 @@ Return value:
     // Wait 10ms if the slot is removable; otherwise, only wait 50us.
     //
 
-    Delay = (SdhcExtension->Removable) ? (10*  1000) : 50;
+    Delay = (SdhcExtension->Removable) ? (10 * 1000) : 50;
     SdPortWait(Delay);
 
     //
@@ -1342,9 +1353,9 @@ Return value:
         }
 
         SdhcWriteRegisterUchar(SdhcExtension, SDHC_POWER_CONTROL, PowerControl);
-        PowerControlCheck = 
+        PowerControlCheck =
             SdhcReadRegisterUchar(SdhcExtension, SDHC_POWER_CONTROL);
-        
+
         if ((PowerControlCheck & Mask) != PowerControl) {
             SdPortWait(1000);
         }
@@ -1364,9 +1375,9 @@ Return value:
         }
 
         SdhcWriteRegisterUchar(SdhcExtension, SDHC_POWER_CONTROL, PowerControl);
-        PowerControlCheck = 
+        PowerControlCheck =
             SdhcReadRegisterUchar(SdhcExtension, SDHC_POWER_CONTROL);
-        
+
         if ((PowerControlCheck & Mask) != PowerControl) {
             SdPortWait(1000);
         }
@@ -1379,9 +1390,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetBusWidth(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ SDPORT_BUS_WIDTH Width
-    )
+)
 
 /*++
 
@@ -1432,9 +1443,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetSpeed(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ SDPORT_BUS_SPEED Speed
-    )
+)
 
 /*++
 
@@ -1497,9 +1508,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetHighSpeed(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
-    )
+)
 
 /*++
 
@@ -1536,9 +1547,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetUhsMode(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ USHORT Mode
-    )
+)
 
 /*++
 
@@ -1563,7 +1574,7 @@ Return value:
 --*/
 
 {
-    
+
     USHORT ClockControl;
     USHORT HostControl2;
 
@@ -1599,9 +1610,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetSignaling(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
-    )
+)
 
 /*++
 
@@ -1644,7 +1655,7 @@ Return value:
     //
 
     DatLines = 0;
-    DatLines = 
+    DatLines =
         SDHC_PS_DAT_3_0 &
         SdhcReadRegisterUlong(SdhcExtension, SDHC_PRESENT_STATE);
 
@@ -1661,7 +1672,8 @@ Return value:
     if (Enable) {
         HostControl2 |= Mask;
 
-    } else {
+    }
+    else {
         HostControl2 &= ~Mask;
     }
 
@@ -1677,8 +1689,9 @@ Return value:
         if ((HostControl2 & Mask) == 0) {
             return STATUS_UNSUCCESSFUL;
         }
-        
-    } else {
+
+    }
+    else {
         if ((HostControl2 & Mask) != 0) {
             return STATUS_UNSUCCESSFUL;
         }
@@ -1712,8 +1725,8 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcExecuteTuning(
-    _In_ PSDHC_EXTENSION SdhcExtension
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension
+)
 
 /*++
 
@@ -1755,8 +1768,8 @@ Return value:
     if ((HostControl2 & SDHC_HC2_EXECUTE_TUNING) == 0) {
         HostControl2 |= SDHC_HC2_EXECUTE_TUNING;
         SdhcWriteRegisterUshort(SdhcExtension,
-                                SDHC_HOST_CONTROL2,
-                                HostControl2);
+            SDHC_HOST_CONTROL2,
+            HostControl2);
     }
 
     RtlZeroMemory(&TuningRequest, sizeof(TuningRequest));
@@ -1768,7 +1781,8 @@ Return value:
         TuningRequest.Command.Index = 19;
         TuningRequest.Command.BlockSize = 64;
 
-    } else {
+    }
+    else {
         TuningRequest.Command.Index = 21;
         TuningRequest.Command.BlockSize = 128;
     }
@@ -1788,11 +1802,11 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-VOID
+void
 SdhcSetLed(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
-    )
+)
 
 /*++
 
@@ -1820,7 +1834,8 @@ Return value:
     if (Enable) {
         HostControl |= SDHC_HC_LED_POWER;
 
-    } else {
+    }
+    else {
         HostControl &= ~SDHC_HC_LED_POWER;
     }
 
@@ -1830,9 +1845,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcSetPresetValue(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
-    )
+)
 
 /*++
 
@@ -1873,9 +1888,9 @@ Return value:
 _IRQL_requires_max_(APC_LEVEL)
 NTSTATUS
 SdhcEnableBlockGapInterrupt(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Enable
-    )
+)
 
 /*++
 
@@ -1905,7 +1920,8 @@ Return value:
     if (Enable) {
         Control |= SDHC_BGC_INTERRUPT_ENABLE;
 
-    } else {
+    }
+    else {
         Control &= ~SDHC_BGC_INTERRUPT_ENABLE;
     }
 
@@ -1913,12 +1929,12 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-VOID
+void
 SdhcSetBlockGapControl(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ BOOLEAN Continue,
     _In_ BOOLEAN RequestStop
-    )
+)
 
 /*++
 
@@ -1945,10 +1961,10 @@ Return value:
     UCHAR BlockGapControl;
 
     BlockGapControl = SdhcReadRegisterUchar(SdhcExtension,
-                                            SDHC_BLOCKGAP_CONTROL);
+        SDHC_BLOCKGAP_CONTROL);
 
     BlockGapControl &= ~SDHC_BGC_CONTINUE;
-    BlockGapControl &= ~SDHC_BGC_STOP_NEXT_GAP;  
+    BlockGapControl &= ~SDHC_BGC_STOP_NEXT_GAP;
     if (Continue) {
         BlockGapControl |= SDHC_BGC_CONTINUE;
     }
@@ -1958,11 +1974,11 @@ Return value:
     }
 }
 
-VOID
+void
 SdhcEnableInterrupt(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG NormalInterruptMask
-    )
+)
 
 /*++
 
@@ -1997,12 +2013,12 @@ Return value:
 
     if (!SdhcExtension->CrashdumpMode) {
         SdhcWriteRegisterUshort(SdhcExtension,
-                                SDHC_INTERRUPT_SIGNAL_ENABLE,
-                                InterruptEnable);
+            SDHC_INTERRUPT_SIGNAL_ENABLE,
+            InterruptEnable);
 
         SdhcWriteRegisterUshort(SdhcExtension,
-                                SDHC_ERROR_SIGNAL_ENABLE,
-                                0xFFFF);
+            SDHC_ERROR_SIGNAL_ENABLE,
+            0xFFFF);
     }
 
     //
@@ -2010,19 +2026,19 @@ Return value:
     //
 
     SdhcWriteRegisterUshort(SdhcExtension,
-                            SDHC_INTERRUPT_STATUS_ENABLE,
-                            InterruptEnable);
+        SDHC_INTERRUPT_STATUS_ENABLE,
+        InterruptEnable);
 
     SdhcWriteRegisterUshort(SdhcExtension,
-                            SDHC_ERROR_STATUS_ENABLE,
-                            0xFFFF);
+        SDHC_ERROR_STATUS_ENABLE,
+        0xFFFF);
 }
 
-VOID
+void
 SdhcDisableInterrupt(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG NormalInterruptMask
-    )
+)
 
 /*++
 
@@ -2054,33 +2070,33 @@ Return value:
     //
     // Disable the interrupt signals on the controller.
     //
-    
-    SdhcWriteRegisterUshort(SdhcExtension,
-                            SDHC_INTERRUPT_STATUS_ENABLE,
-                            InterruptDisable);
 
     SdhcWriteRegisterUshort(SdhcExtension,
-                            SDHC_ERROR_STATUS_ENABLE,
-                            0);
+        SDHC_INTERRUPT_STATUS_ENABLE,
+        InterruptDisable);
+
+    SdhcWriteRegisterUshort(SdhcExtension,
+        SDHC_ERROR_STATUS_ENABLE,
+        0);
 
     //
     // Disable the interrupt signals from controller to OS.
     //
 
     SdhcWriteRegisterUshort(SdhcExtension,
-                            SDHC_INTERRUPT_SIGNAL_ENABLE,
-                            InterruptDisable);
+        SDHC_INTERRUPT_SIGNAL_ENABLE,
+        InterruptDisable);
 
     SdhcWriteRegisterUshort(SdhcExtension,
-                            SDHC_ERROR_SIGNAL_ENABLE,
-                            0);
+        SDHC_ERROR_SIGNAL_ENABLE,
+        0);
 }
 
 __forceinline
 USHORT
 SdhcGetInterruptStatus(
-    _In_ PSDHC_EXTENSION SdhcExtension
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension
+)
 
 /*++
 
@@ -2104,7 +2120,7 @@ Return value:
 
     USHORT InterruptStatus;
 
-    InterruptStatus = 
+    InterruptStatus =
         SdhcReadRegisterUshort(SdhcExtension, SDHC_INTERRUPT_STATUS);
 
     //
@@ -2122,8 +2138,8 @@ Return value:
 __forceinline
 USHORT
 SdhcGetErrorStatus(
-    _In_ PSDHC_EXTENSION SdhcExtension
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension
+)
 
 /*++
 
@@ -2149,8 +2165,8 @@ Return value:
 __forceinline
 USHORT
 SdhcGetAutoCmd12ErrorStatus(
-    _In_ PSDHC_EXTENSION SdhcExtension
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension
+)
 
 /*++
 
@@ -2175,8 +2191,8 @@ Return value:
 
 USHORT
 SdhcGetAdmaErrorStatus(
-    _In_ PSDHC_EXTENSION SdhcExtension
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension
+)
 
 /*++
 
@@ -2199,11 +2215,11 @@ Return value:
     return SdhcReadRegisterUshort(SdhcExtension, SDHC_ADMA_ERROR_STATUS);
 }
 
-VOID
+void
 SdhcAcknowledgeInterrupts(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ USHORT Interrupts
-    )
+)
 
 /*++
 
@@ -2236,13 +2252,13 @@ Return value:
         // according to the spec.
         //
 
-        SdhcWriteRegisterUshort(SdhcExtension, 
-                                SDHC_AUTO_CMD12_ERROR_STATUS,
-                                0xFFFF);
+        SdhcWriteRegisterUshort(SdhcExtension,
+            SDHC_AUTO_CMD12_ERROR_STATUS,
+            0xFFFF);
 
         SdhcWriteRegisterUshort(SdhcExtension,
-                                SDHC_AUTO_CMD12_ERROR_STATUS,
-                                0x0);
+            SDHC_AUTO_CMD12_ERROR_STATUS,
+            0x0);
 
         //
         // Clear the error interrupt by writing all-ones.
@@ -2261,8 +2277,8 @@ Return value:
 
 BOOLEAN
 SdhcIsCardInserted(
-    _In_ PSDHC_EXTENSION SdhcExtension
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension
+)
 
 /*++
 
@@ -2285,13 +2301,13 @@ Return value:
     ULONG PresentState;
 
     PresentState = SdhcReadRegisterUlong(SdhcExtension, SDHC_PRESENT_STATE);
-    return (BOOLEAN) ((PresentState & SDHC_PS_CARD_INSERTED) != 0);
+    return (BOOLEAN)((PresentState & SDHC_PS_CARD_INSERTED) != 0);
 }
 
 BOOLEAN
 SdhcIsWriteProtected(
-    _In_ PSDHC_EXTENSION SdhcExtension
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension
+)
 
 /*++
 
@@ -2319,15 +2335,15 @@ Return value:
     //
 
     PresentState = SdhcReadRegisterUlong(SdhcExtension, SDHC_PRESENT_STATE);
-    WriteProtected = (BOOLEAN) ((PresentState & SDHC_PS_WRITE_PROTECT) == 0);
+    WriteProtected = (BOOLEAN)((PresentState & SDHC_PS_WRITE_PROTECT) == 0);
     return WriteProtected;
 }
 
 NTSTATUS
 SdhcSendCommand(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
+)
 
 /*++
 
@@ -2353,7 +2369,7 @@ Return value:
 
 {
 
-    PSDPORT_COMMAND Command;
+    SDPORT_COMMAND* Command;
     USHORT CommandType;
     USHORT CommandReg;
     NTSTATUS Status;
@@ -2387,28 +2403,28 @@ Return value:
     case SdResponseTypeR1:
     case SdResponseTypeR5:
     case SdResponseTypeR6:
-        CommandReg |= SDHC_CMD_RESPONSE_48BIT_NOBUSY | 
-                      SDHC_CMD_CRC_CHECK_ENABLE | 
-                      SDHC_CMD_INDEX_CHECK_ENABLE;
+        CommandReg |= SDHC_CMD_RESPONSE_48BIT_NOBUSY |
+            SDHC_CMD_CRC_CHECK_ENABLE |
+            SDHC_CMD_INDEX_CHECK_ENABLE;
         break;
 
     case SdResponseTypeR1B:
     case SdResponseTypeR5B:
         CommandReg |= SDHC_CMD_RESPONSE_48BIT_WBUSY |
-                      SDHC_CMD_CRC_CHECK_ENABLE | 
-                      SDHC_CMD_INDEX_CHECK_ENABLE;
+            SDHC_CMD_CRC_CHECK_ENABLE |
+            SDHC_CMD_INDEX_CHECK_ENABLE;
         break;
 
     case SdResponseTypeR2:
-        CommandReg |= SDHC_CMD_RESPONSE_136BIT | 
-                      SDHC_CMD_CRC_CHECK_ENABLE;
+        CommandReg |= SDHC_CMD_RESPONSE_136BIT |
+            SDHC_CMD_CRC_CHECK_ENABLE;
         break;
 
     case SdResponseTypeR3:
     case SdResponseTypeR4:
         CommandReg |= SDHC_CMD_RESPONSE_48BIT_NOBUSY;
         break;
-    
+
     default:
 
         NT_ASSERTMSG("SDHC - Invalid response type", FALSE);
@@ -2420,16 +2436,17 @@ Return value:
         TransferMode = 0;
         CommandReg |= SDHC_CMD_DATA_PRESENT;
 
-    } else {
-        TransferMode = 
+    }
+    else {
+        TransferMode =
             SdhcReadRegisterUshort(SdhcExtension, SDHC_TRANSFER_MODE);
 
         TransferMode &= ~SDHC_TM_DMA_ENABLE;
         TransferMode &= ~SDHC_TM_AUTO_CMD12_ENABLE;
         TransferMode &= ~SDHC_TM_AUTO_CMD23_ENABLE;
         SdhcWriteRegisterUshort(SdhcExtension,
-                                SDHC_TRANSFER_MODE,
-                                TransferMode);
+            SDHC_TRANSFER_MODE,
+            TransferMode);
     }
 
     switch (Command->Type) {
@@ -2456,7 +2473,7 @@ Return value:
     // type or whether the command involves data transfer, we will need
     // to wait on a number of different events.
     //
-    
+
     Request->RequiredEvents = SDHC_IS_CMD_COMPLETE;
     if ((Command->ResponseType == SdResponseTypeR1B) ||
         (Command->ResponseType == SdResponseTypeR5B)) {
@@ -2467,11 +2484,13 @@ Return value:
     if (Request->Command.TransferMethod == SdTransferMethodSgDma) {
         Request->RequiredEvents |= SDHC_IS_TRANSFER_COMPLETE;
 
-    } else if (Request->Command.TransferMethod == SdTransferMethodPio) {
+    }
+    else if (Request->Command.TransferMethod == SdTransferMethodPio) {
         if (Request->Command.TransferDirection == SdTransferDirectionRead) {
             Request->RequiredEvents |= SDHC_IS_BUFFER_READ_READY;
 
-        } else {
+        }
+        else {
             Request->RequiredEvents |= SDHC_IS_BUFFER_WRITE_READY;
         }
     }
@@ -2492,10 +2511,10 @@ Return value:
 
 NTSTATUS
 SdhcGetResponse(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_COMMAND Command,
-    _Out_ PVOID ResponseBuffer
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_COMMAND* Command,
+    _Out_ void* ResponseBuffer
+)
 
 /*++
 
@@ -2521,7 +2540,7 @@ Return value:
 {
 
     UCHAR Index;
-    PUCHAR Response;
+    UCHAR* Response;
     UCHAR ResponseLength;
 
     ResponseLength = SdhcGetResponseLength(Command);
@@ -2529,12 +2548,12 @@ Return value:
         return STATUS_INVALID_PARAMETER;
     }
 
-    Response = (PUCHAR) ResponseBuffer;
+    Response = (UCHAR*)ResponseBuffer;
     for (Index = 0; Index < ResponseLength; Index += 1) {
 
 #pragma prefast(suppress: 22103, "Response length is guaranteed to be <= ResponseLength.")
 
-        Response[Index] = 
+        Response[Index] =
             SdhcReadRegisterUchar(SdhcExtension, SDHC_RESPONSE + Index);
     }
 
@@ -2543,9 +2562,9 @@ Return value:
 
 NTSTATUS
 SdhcSetTransferMode(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
+)
 
 /*++
 
@@ -2591,10 +2610,10 @@ Return value:
 
     TransferMode = 0;
     TransferMode &= ~(SDHC_TM_AUTO_CMD12_ENABLE |
-                      SDHC_TM_AUTO_CMD23_ENABLE |
-                      SDHC_TM_DMA_ENABLE |
-                      SDHC_TM_BLKCNT_ENABLE |
-                      SDHC_TM_MULTIBLOCK);
+        SDHC_TM_AUTO_CMD23_ENABLE |
+        SDHC_TM_DMA_ENABLE |
+        SDHC_TM_BLKCNT_ENABLE |
+        SDHC_TM_MULTIBLOCK);
 
     // if (Command->TransferType = TransferTypeMultiBlockNoStop) {
 
@@ -2609,7 +2628,8 @@ Return value:
     if (Request->Command.TransferMethod == SdTransferMethodSgDma) {
         TransferMode |= SDHC_TM_DMA_ENABLE;
 
-    } else {
+    }
+    else {
 
         NT_ASSERT(Request->Command.TransferMethod == SdTransferMethodPio);
 
@@ -2628,12 +2648,12 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-VOID
+void
 SdhcReadDataPort(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _Out_writes_all_(Length) PUCHAR Buffer,
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _Out_writes_all_(Length) UCHAR* Buffer,
     _In_ SIZE_T Length
-    )
+)
 
 /*++
 
@@ -2669,14 +2689,14 @@ Return value:
 
 {
 
-    PUCHAR Port;
+    UCHAR* Port;
 
-    Port = (PUCHAR) SdhcExtension->BaseAddress + SDHC_DATA_PORT;
+    Port = (UCHAR*)SdhcExtension->BaseAddress + SDHC_DATA_PORT;
     while (Length >= sizeof(ULONG)) {
         SdhcReadRegisterBufferUlong(SdhcExtension,
-                                    SDHC_DATA_PORT,
-                                    (PULONG) Buffer,
-                                    1);
+            SDHC_DATA_PORT,
+            (ULONG*)Buffer,
+            1);
 
         Buffer += sizeof(ULONG);
         Length -= sizeof(ULONG);
@@ -2684,28 +2704,28 @@ Return value:
 
     if (Length >= sizeof(USHORT)) {
         SdhcReadRegisterBufferUshort(SdhcExtension,
-                                     SDHC_DATA_PORT,
-                                     (PUSHORT) Buffer,
-                                     1);
+            SDHC_DATA_PORT,
+            (USHORT*)Buffer,
+            1);
 
         Buffer += sizeof(USHORT);
         Length -= sizeof(USHORT);
     }
 
     if (Length >= sizeof(UCHAR)) {
-        SdhcReadRegisterBufferUchar(SdhcExtension, 
-                                    SDHC_DATA_PORT + sizeof(USHORT),
-                                    Buffer,
-                                    1);
+        SdhcReadRegisterBufferUchar(SdhcExtension,
+            SDHC_DATA_PORT + sizeof(USHORT),
+            Buffer,
+            1);
     }
 }
 
-VOID
+void
 SdhcWriteDataPort(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_reads_(Length) PUCHAR Buffer,
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_reads_(Length) UCHAR* Buffer,
     _In_ ULONG Length
-    )
+)
 
 /*++
 
@@ -2743,9 +2763,9 @@ Return value:
 
     while (Length >= sizeof(ULONG)) {
         SdhcWriteRegisterBufferUlong(SdhcExtension,
-                                     SDHC_DATA_PORT,
-                                     (PULONG) Buffer,
-                                     1);
+            SDHC_DATA_PORT,
+            (ULONG*)Buffer,
+            1);
 
         Buffer += sizeof(ULONG);
         Length -= sizeof(ULONG);
@@ -2753,9 +2773,9 @@ Return value:
 
     if (Length >= sizeof(USHORT)) {
         SdhcWriteRegisterBufferUshort(SdhcExtension,
-                                      SDHC_DATA_PORT,
-                                      (PUSHORT) Buffer,
-                                      1);
+            SDHC_DATA_PORT,
+            (USHORT*)Buffer,
+            1);
 
         Buffer += sizeof(USHORT);
         Length -= sizeof(USHORT);
@@ -2763,20 +2783,20 @@ Return value:
 
     if (Length >= sizeof(UCHAR)) {
         SdhcWriteRegisterBufferUchar(SdhcExtension,
-                                     SDHC_DATA_PORT + sizeof(USHORT),
-                                     Buffer,
-                                     1);
+            SDHC_DATA_PORT + sizeof(USHORT),
+            Buffer,
+            1);
     }
 
-    NT_ASSERT((SdhcReadRegisterUshort(SdhcExtension, SDHC_ERROR_STATUS) & 
-              SDHC_ES_BAD_DATA_SPACE_ACCESS) == 0);
+    NT_ASSERT((SdhcReadRegisterUshort(SdhcExtension, SDHC_ERROR_STATUS) &
+        SDHC_ES_BAD_DATA_SPACE_ACCESS) == 0);
 }
 
 NTSTATUS
 SdhcBuildTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
+)
 
 /*++
 
@@ -2823,9 +2843,9 @@ Return value:
 
 NTSTATUS
 SdhcStartTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
+)
 
 /*++
 
@@ -2870,9 +2890,9 @@ Return value:
 
 NTSTATUS
 SdhcBuildPioTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
+)
 
 /*++
 
@@ -2900,9 +2920,9 @@ Return value:
 
 NTSTATUS
 SdhcBuildAdmaTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
+)
 
 /*++
 
@@ -2938,25 +2958,26 @@ Return value:
     // Create the ADMA2 descriptor table in the host's DMA buffer.
     //
 
-    Status = 
+    Status =
         SdhcCreateAdmaDescriptorTable(
-            Request, 
-            (BOOLEAN) SdhcExtension->Capabilities.Supported.Address64Bit,
+            Request,
+            (BOOLEAN)SdhcExtension->Capabilities.Supported.Address64Bit,
             &TransferLength);
 
     if (!NT_SUCCESS(Status)) {
         return Status;
     }
 
-    SdhcWriteRegisterUlong(SdhcExtension, 
-                           SDHC_ADMA_SYSADDR_LOW, 
-                           Request->Command.DmaPhysicalAddress.LowPart);
+    SdhcWriteRegisterUlong(SdhcExtension,
+        SDHC_ADMA_SYSADDR_LOW,
+        Request->Command.DmaPhysicalAddress.LowPart);
 
     if (SdhcExtension->Capabilities.Supported.Address64Bit) {
         SdhcWriteRegisterUlong(SdhcExtension,
-                               SDHC_ADMA_SYSADDR_HIGH,
-                               Request->Command.DmaPhysicalAddress.HighPart);
-    } else {
+            SDHC_ADMA_SYSADDR_HIGH,
+            Request->Command.DmaPhysicalAddress.HighPart);
+    }
+    else {
 
         NT_ASSERT(Request->Command.DmaPhysicalAddress.HighPart == 0);
 
@@ -2967,9 +2988,9 @@ Return value:
 
 NTSTATUS
 SdhcStartPioTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
+)
 
 /*++
 
@@ -2992,17 +3013,18 @@ Return value:
 {
 
     NT_ASSERT((Request->Command.TransferDirection == SdTransferDirectionRead) ||
-              (Request->Command.TransferDirection == SdTransferDirectionWrite));
+        (Request->Command.TransferDirection == SdTransferDirectionWrite));
 
     if (Request->Command.TransferDirection == SdTransferDirectionRead) {
         SdhcReadDataPort(SdhcExtension,
-                         Request->Command.DataBuffer,
-                         Request->Command.BlockSize);
+            Request->Command.DataBuffer,
+            Request->Command.BlockSize);
 
-    } else {
+    }
+    else {
         SdhcWriteDataPort(SdhcExtension,
-                          Request->Command.DataBuffer,
-                          Request->Command.BlockSize);
+            Request->Command.DataBuffer,
+            Request->Command.BlockSize);
     }
 
     Request->Command.BlockCount -= 1;
@@ -3011,13 +3033,15 @@ Return value:
         if (Request->Command.TransferDirection == SdTransferDirectionRead) {
             Request->RequiredEvents |= SDHC_IS_BUFFER_READ_READY;
 
-        } else {
+        }
+        else {
             Request->RequiredEvents |= SDHC_IS_BUFFER_WRITE_READY;
         }
 
         Request->Status = STATUS_MORE_PROCESSING_REQUIRED;
 
-    } else {
+    }
+    else {
 
         NT_ASSERT(Request->Command.BlockCount == 0);
 
@@ -3030,9 +3054,9 @@ Return value:
 
 NTSTATUS
 SdhcStartAdmaTransfer(
-    _In_ PSDHC_EXTENSION SdhcExtension,
-    _In_ PSDPORT_REQUEST Request
-    )
+    _In_ SDHC_EXTENSION* SdhcExtension,
+    _In_ SDPORT_REQUEST* Request
+)
 
 /*++
 
@@ -3063,10 +3087,10 @@ Return value:
 
 USHORT
 SdhcCalcClockFrequency(
-    _In_ PSDHC_EXTENSION SdhcExtension,
+    _In_ SDHC_EXTENSION* SdhcExtension,
     _In_ ULONG TargetFrequency,
-    _Out_ PULONG ActualFrequency
-    )
+    _Out_ ULONG* ActualFrequency
+)
 
 /*++
 
@@ -3097,7 +3121,7 @@ Return value:
 
     *ActualFrequency = 0;
     BaseFrequency = SdhcExtension->Capabilities.BaseClockFrequencyKhz;
-    Divisor = MAX(BaseFrequency / TargetFrequency, 1);
+    Divisor = Max(BaseFrequency / TargetFrequency, 1);
 
     NT_ASSERT(Divisor > 0);
 
@@ -3111,16 +3135,17 @@ Return value:
 
         Divisor = 1;
         while (((BaseFrequency / Divisor) > TargetFrequency) &&
-               (Divisor < SDHC_MAX_CLOCK_DIVISOR)) {
+            (Divisor < SDHC_MAX_CLOCK_DIVISOR)) {
 
             Divisor <<= 1;
         }
 
         *ActualFrequency = BaseFrequency / Divisor;
         Divisor >>= 1;
-        ClockControl = ((USHORT) Divisor << 8);
+        ClockControl = ((USHORT)Divisor << 8);
 
-    } else {
+    }
+    else {
 
         //
         // Host controller version 3.0 supports the 10-bit divided clock mode.
@@ -3141,14 +3166,15 @@ Return value:
         if (Divisor == 0) {
             *ActualFrequency = BaseFrequency;
 
-        } else {
+        }
+        else {
             *ActualFrequency = BaseFrequency / Divisor;
             *ActualFrequency >>= 1;
         }
 
-        ClockControl = ((USHORT) Divisor & 0xFF) << 8;
+        ClockControl = ((USHORT)Divisor & 0xFF) << 8;
         Divisor >>= 8;
-        ClockControl |= ((USHORT) Divisor & 0x03) << 6;
+        ClockControl |= ((USHORT)Divisor & 0x03) << 6;
     }
 
     NT_ASSERT((BaseFrequency <= TargetFrequency) ? (Divisor == 0) : TRUE);
@@ -3158,10 +3184,10 @@ Return value:
 
 NTSTATUS
 SdhcCreateAdmaDescriptorTable(
-    _In_ PSDPORT_REQUEST Request,
+    _In_ SDPORT_REQUEST* Request,
     _In_ BOOLEAN Use64BitDescriptor,
-    _Out_ PULONG TotalTransferLength
-    )
+    _Out_ ULONG* TotalTransferLength
+)
 
 /*++
 
@@ -3176,7 +3202,7 @@ Arguments:
 
     Request - Data transfer request for which to build the descriptor table.
 
-    TotalTransferLength - Supplies the pointer to return the total transfer 
+    TotalTransferLength - Supplies the pointer to return the total transfer
                           length of the descriptor table
 
 Return value:
@@ -3186,15 +3212,14 @@ Return value:
 --*/
 
 {
-
-    PUCHAR Buffer;
-    PSDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY Descriptor;
+    UCHAR* Buffer;
+    SDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY* Descriptor;
     ULONG NumberOfElements;
     PHYSICAL_ADDRESS NextAddress;
     ULONG NextLength;
     ULONG RemainingLength;
     PSCATTER_GATHER_ELEMENT SglistElement;
-    
+
     Buffer = static_cast<UCHAR*>(Request->Command.DmaVirtualAddress);
     Descriptor = NULL;
     NumberOfElements = Request->Command.ScatterGatherList->NumberOfElements;
@@ -3215,14 +3240,14 @@ Return value:
         NT_ASSERT(RemainingLength > 0);
 
         while (RemainingLength > 0) {
-            Descriptor = (PSDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY) Buffer;
+            Descriptor = (SDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY*)Buffer;
             Buffer += sizeof(SDHC_ADMA2_DESCRIPTOR_TABLE_ENTRY);
 
-            NT_ASSERT((ULONG_PTR) Buffer <
-                      (ULONG_PTR) Request->Command.DmaVirtualAddress + 
-                                  Request->Command.Length);
+            NT_ASSERT((ULONG_PTR)Buffer <
+                (ULONG_PTR)Request->Command.DmaVirtualAddress +
+                Request->Command.Length);
 
-            NextLength = MIN(SDHC_ADMA2_MAX_LENGTH_PER_ENTRY, RemainingLength);
+            NextLength = Min(SDHC_ADMA2_MAX_LENGTH_PER_ENTRY, RemainingLength);
             RemainingLength -= NextLength;
 
             //
@@ -3240,10 +3265,11 @@ Return value:
             //
 
             if (Use64BitDescriptor) {
-                *((PULONGLONG) Buffer) = NextAddress.QuadPart;
+                *((ULONGLONG*)Buffer) = NextAddress.QuadPart;
                 Buffer += sizeof(LONGLONG);
 
-            } else {
+            }
+            else {
 
                 //
                 // The HighPart should not be a non-zero value, since in the
@@ -3253,7 +3279,7 @@ Return value:
 
                 NT_ASSERT(NextAddress.HighPart == 0);
 
-                *((PULONG) Buffer) = NextAddress.LowPart;
+                *((ULONG*)Buffer) = NextAddress.LowPart;
                 Buffer += sizeof(ULONG);
             }
 
@@ -3275,10 +3301,10 @@ Return value:
     return STATUS_SUCCESS;
 }
 
-VOID
+void
 SdhcInitializePciConfigSpace(
-    _In_ PSD_MINIPORT Miniport
-    )
+    _In_ SD_MINIPORT* Miniport
+)
 
 /*++
 
@@ -3297,14 +3323,6 @@ Return value:
 --*/
 
 {
-
-
-
-
-
-
-
-
     if (Miniport->ConfigurationInfo.BusType != SdBusTypePci) {
         return;
     }
@@ -3322,133 +3340,13 @@ Return value:
     // PciConfig = 0;
     // SdPortGetPciConfigSpace(Miniport,
     //                         0xA0,
-    //                         (PUCHAR)&PciConfig,
+    //                         (UCHAR*)&PciConfig,
     //                         sizeof(PciConfig));
     //
     // PciConfig &= ~(1 << 31);
     // SdPortSetPciConfigSpace(Miniport,
     //                         0xA0,
-    //                         (PUCHAR)&PciConfig,
+    //                         (UCHAR*)&PciConfig,
     //                         sizeof(PciConfig));
     //
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 }
