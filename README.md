@@ -39,7 +39,7 @@ See [PlatformSmbiosDxe.c](https://github.com/ms-iot/RPi-UEFI/blob/ms-iot/Pi3Boar
 1. Set your build configuration (Release or Debug)
 1. Build -> Build Solution
 
-The resulting driver binaries will be located in the `windows-drivers\build\bcm2836\ARM` folder, or `windows-drivers\build\bcm2836\ARM64` if you picked an Arm 64-bit configuration.
+The resulting driver binaries will be located in the `windows-drivers\build\bcm2836\ARM\Output` folder, or `windows-drivers\build\bcm2836\ARM64\Output` if you picked an Arm 64-bit configuration.
 
 ## Export the bsp
 
