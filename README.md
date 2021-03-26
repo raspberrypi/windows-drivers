@@ -9,7 +9,11 @@ It also contains BSP components for the Raspberry Pi 2 (v1.2), 3, 4 and correspo
 This BSP repository is under community support; it is not actively maintained by Microsoft. 
 For Raspberry Pi 4 onwards, it's designed for use with Windows 10 version 2004 and later, because of use of newer driver frameworks which are not available on earlier releases.
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+## 64-bit firmware
+
+For the Raspberry Pi 4, firmware from the [Pi Firmware Task Force](https://rpi4-uefi.dev) is used, which provides UEFI and ACPI support. It is available at https://github.com/pftf/RPi4/releases.
+
+For the Raspberry Pi 2 (v1.2) and Raspberry Pi 3, the Pi Firmware Task Force provides firmware at https://github.com/pftf/RPi3/releases, which provides UEFI and ACPI support.
 
 ## 32-bit firmware
 
@@ -17,11 +21,6 @@ Sample binaries of the firmware is included in [RPi.BootFirmware](bspfiles/Packa
 
 1. Firmware binaries : [RaspberryPi/Firmware](https://github.com/raspberrypi/firmware)
 2. UEFI Sources : [RPi/UEFI](https://github.com/ms-iot/RPi-UEFI)
-
-## 64-bit firmware
-
-For the Raspberry Pi 4, firmware from the [Pi Firmware Task Force](https://rpi4-uefi.dev) is used, which provides UEFI and ACPI support.
-For the Raspberry Pi 2 (v1.2) and Raspberry Pi 3, the Pi Firmware Task Force provides firmware at https://github.com/pftf/RPi3/releases, which provides UEFI and ACPI support.
 
 ### 32-bit EFI Customisations
 
