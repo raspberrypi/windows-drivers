@@ -456,6 +456,7 @@ private: // non-paged
     static SDPORT_ISSUE_BUS_OPERATION sdhcIssueBusOperation;
     static SDPORT_GET_CARD_DETECT_STATE sdhcGetCardDetectState;
     static SDPORT_GET_WRITE_PROTECT_STATE sdhcGetWriteProtectState;
+    static SDPORT_PO_FX_POWER_CONTROL_CALLBACK sdhcPowerControlCallback;
     static SDPORT_CLEANUP sdhcCleanup;
 
     _IRQL_requires_max_(APC_LEVEL)

@@ -936,6 +936,29 @@ BOOLEAN SDHC::sdhcGetWriteProtectState (
 } // SDHC::sdhcGetWriteProtectState (...)
 
 _Use_decl_annotations_
+NTSTATUS SDHC::sdhcPowerControlCallback(
+    PSD_MINIPORT Miniport,
+    LPCGUID PowerControlCode,
+    PVOID InputBuffer,
+    SIZE_T InputBufferSize,
+    PVOID OutputBuffer,
+    SIZE_T OutputBufferSize,
+    PSIZE_T BytesReturned
+)
+{
+
+    UNREFERENCED_PARAMETER(Miniport);
+    UNREFERENCED_PARAMETER(PowerControlCode);
+    UNREFERENCED_PARAMETER(InputBuffer);
+    UNREFERENCED_PARAMETER(InputBufferSize);
+    UNREFERENCED_PARAMETER(OutputBuffer);
+    UNREFERENCED_PARAMETER(OutputBufferSize);
+    UNREFERENCED_PARAMETER(BytesReturned);
+
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+_Use_decl_annotations_
 void SDHC::sdhcCleanup (
     SD_MINIPORT* MiniportPtr
     )
@@ -2134,7 +2157,7 @@ DriverEntry (
         sdhcInitializationData.IssueBusOperation = SDHC::sdhcIssueBusOperation;
         sdhcInitializationData.GetCardDetectState = SDHC::sdhcGetCardDetectState;
         sdhcInitializationData.GetWriteProtectState = SDHC::sdhcGetWriteProtectState;
-        sdhcInitializationData.PowerControlCallback = nullptr; // Not supported
+        sdhcInitializationData.PowerControlCallback = SDHC::sdhcPowerControlCallback;
         sdhcInitializationData.Cleanup = SDHC::sdhcCleanup;
         sdhcInitializationData.PrivateExtensionSize = sizeof(SDHC);
         sdhcInitializationData.CrashdumpSupported = TRUE;
@@ -2148,6 +2171,9 @@ DriverEntry (
         SDHC_LOG_ERROR(
             "SdPortInitialize(...) failed. (status = %!STATUS!)",
             status);
+        if (KeGetCurrentIrql() < DISPATCH_LEVEL) {
+            SDHC_LOG_CLEANUP();
+        } // if
         return status;
     } // if
 
