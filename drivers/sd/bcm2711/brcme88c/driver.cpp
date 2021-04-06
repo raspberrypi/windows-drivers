@@ -245,7 +245,7 @@ DriverRpiqIsAvailable()
     return g_rpiqFileObject != nullptr;
 }
 
-_Use_decl_annotations_ // <= APC_LEVEL
+_Use_decl_annotations_ // = PASSIVE_LEVEL
 NTSTATUS CODE_SEG_PAGE
 DriverRpiqProperty(
     _Inout_ MAILBOX_HEADER* item)
@@ -261,7 +261,7 @@ DriverRpiqProperty(
     else
     {
         KEVENT event;
-        KeInitializeEvent(&event, NotificationEvent, FALSE);
+        KeInitializeEvent(&event, NotificationEvent, false);
 
         DEVICE_OBJECT* deviceObject = IoGetRelatedDeviceObject(g_rpiqFileObject);
         IO_STATUS_BLOCK statusBlock = {};

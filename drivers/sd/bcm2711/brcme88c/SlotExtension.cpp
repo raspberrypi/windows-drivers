@@ -63,8 +63,9 @@ SlotExtension::SlotInitialize(
     m_regulatorVoltage1_8 = false;
 
     // BRCME88C: Voltage regulator control.
+    bool const driverRpiqIsAvailable = DriverRpiqIsAvailable();
     ULONG oldSignalingVoltageGpioState = 98; // 98 = Dummy "RPIQ not available" flag
-    if (DriverRpiqIsAvailable())
+    if (driverRpiqIsAvailable)
     {
         // For informational purposes, get existing voltage state.
         MAILBOX_GET_SET_GPIO_EXPANDER info;
@@ -115,7 +116,7 @@ SlotExtension::SlotInitialize(
     m_capabilities.PioTransferMaxThreshold = 64;
 
     // BRCME88C: 1.8v available only if RPIQ driver online.
-    bool const signalingVoltage18V = regCaps.DDR50 != 0 && DriverRpiqIsAvailable();
+    bool const signalingVoltage18V = regCaps.DDR50 != 0 && driverRpiqIsAvailable;
 
     m_capabilities.Supported.ScatterGatherDma = false; // DMA-TODO: regCaps.Adma2 != 0;
     m_capabilities.Supported.Address64Bit = regCaps.SystemAddress64BitV3 != 0;
@@ -140,7 +141,8 @@ SlotExtension::SlotInitialize(
     m_capabilities.Supported.AutoCmd12 = true;
     m_capabilities.Supported.AutoCmd23 = specVersion >= SdRegSpecVersion3;
 
-    // BRCME88C: We only support 1.8 for signaling, not for bus.
+    // BRCME88C: Capabilities are wrong. It only supports 1.8v for signaling,
+    // not for VDD1.
     m_capabilities.Supported.Voltage18V = false; // regCaps.Voltage1_8 != 0;
 
     m_capabilities.Supported.Voltage30V = regCaps.Voltage3_0 != 0;
@@ -327,7 +329,7 @@ SlotExtension::SlotInterrupt(
         unreported.CardRemoval = false;
         unreported.CardInterrupt = false;
         unreported.ReTuningEvent = false;
-        unreported.ErrorInterrupt;
+        unreported.ErrorInterrupt = false;
 
         *events = unreported.U16;
         *errors = interrupts.ErrorInterrupt
@@ -603,7 +605,7 @@ SlotExtension::SlotRestoreContext()
     return;
 }
 
-_Use_decl_annotations_ // <= APC_LEVEL
+_Use_decl_annotations_ // = PASSIVE_LEVEL
 NTSTATUS CODE_SEG_PAGE
 SlotExtension::SetRegulatorVoltage1_8(bool regulatorVoltage1_8)
 {
@@ -611,9 +613,6 @@ SlotExtension::SetRegulatorVoltage1_8(bool regulatorVoltage1_8)
 
     NTSTATUS status;
     MAILBOX_GET_SET_GPIO_EXPANDER info;
-
-    LogInfo("SetRegulatorVoltage1_8-Entry",
-        TraceLoggingUInt8(regulatorVoltage1_8, "requested"));
 
     INIT_MAILBOX_SET_GPIO_EXPANDER(&info, SignalingVoltageGpio, regulatorVoltage1_8);
     status = DriverRpiqProperty(&info.Header);
@@ -625,6 +624,71 @@ SlotExtension::SetRegulatorVoltage1_8(bool regulatorVoltage1_8)
     LogInfo("SetRegulatorVoltage1_8",
         TraceLoggingUInt8(regulatorVoltage1_8, "requested"),
         TraceLoggingNTStatus(status));
+
+    return status;
+}
+
+struct SetRegulatorVoltageContext
+{
+    SlotExtension* const slotExtension;
+    bool const regulatorVoltage1_8;
+    NTSTATUS status;
+    KEVENT event;
+};
+
+_Use_decl_annotations_
+void CODE_SEG_PAGE
+SlotExtension::InvokeSetRegulatorVoltageWorker(void* parameter)
+{
+    PAGED_CODE();
+
+    auto const context = static_cast<SetRegulatorVoltageContext*>(parameter);
+    context->status = context->slotExtension->SetRegulatorVoltage1_8(
+        context->regulatorVoltage1_8);
+    KeSetEvent(&context->event, 0, false);
+}
+
+_Use_decl_annotations_ // <= APC_LEVEL
+NTSTATUS CODE_SEG_PAGE
+SlotExtension::InvokeSetRegulatorVoltage1_8(bool regulatorVoltage1_8)
+{
+    PAGED_CODE();
+
+    NTSTATUS status;
+
+    if (KeGetCurrentIrql() == PASSIVE_LEVEL)
+    {
+        status = SetRegulatorVoltage1_8(regulatorVoltage1_8);
+    }
+    else
+    {
+        /*
+        RPIQ requires caller to be running at PASSIVE_LEVEL.
+
+        Some of the callers of this function could, in theory, be called at APC_LEVEL.
+        (It doesn't happen in practice right now, but perhaps it might change.)
+
+        If this function is ever called at APC_LEVEL, we marshal the call onto a worker
+        thread running at PASSIVE_LEVEL. Waiting at APC for PASSIVE work to complete is
+        technically a priority inversion, but I don't think that's a major problem,
+        especially since this code only gets called during device configuration.
+        */
+
+        SetRegulatorVoltageContext context = { this, regulatorVoltage1_8 };
+        KeInitializeEvent(&context.event, NotificationEvent, false);
+        m_rpiqWorkItem = { {}, &InvokeSetRegulatorVoltageWorker, &context };
+
+        // ExQueueWorkItem is deprecated because IoAllocateWorkItem does better
+        // tracking. We don't need the tracking, and this has lower overhead.
+#pragma warning(suppress:4996)
+        ExQueueWorkItem(&m_rpiqWorkItem, CriticalWorkQueue);
+
+        KeWaitForSingleObject(&context.event, Executive, KernelMode, false, nullptr);
+        status = context.status;
+        LogInfo("InvokeSetRegulatorVoltage1_8",
+            TraceLoggingUInt8(regulatorVoltage1_8, "requested"),
+            TraceLoggingNTStatus(status));
+    }
 
     return status;
 }
@@ -915,25 +979,7 @@ NTSTATUS CODE_SEG_PAGE
 SlotExtension::ResetHw()
 {
     PAGED_CODE();
-
-    SdRegClockControl clockControl(READ_REGISTER_USHORT(&m_registers->ClockControl.U16));
-    clockControl.SdClockEnable = false;
-    WRITE_REGISTER_USHORT(&m_registers->ClockControl.U16, clockControl.U16);
-    clockControl.U16 = 0;
-    WRITE_REGISTER_USHORT(&m_registers->ClockControl.U16, clockControl.U16);
-
-    SdRegPowerControl powerControl(READ_REGISTER_UCHAR(&m_registers->PowerControl.U8));
-    powerControl.Vdd1Power = false;
-    WRITE_REGISTER_UCHAR(&m_registers->PowerControl.U8, powerControl.U8);
-    powerControl.U8 = 0;
-    WRITE_REGISTER_UCHAR(&m_registers->PowerControl.U8, powerControl.U8);
-
-    LogInfo("ResetHw",
-        TraceLoggingHexInt8(READ_REGISTER_UCHAR((UCHAR*)&m_registers->SoftwareReset), "SoftwareReset"),
-        TraceLoggingHexInt32(READ_REGISTER_ULONG(&m_registers->PresentState.U32), "PresentState"),
-        TraceLoggingHexInt32(READ_REGISTER_UCHAR(&m_registers->HostControl1.U8), "HostControl1"),
-        TraceLoggingHexInt32(READ_REGISTER_USHORT(&m_registers->HostControl2.U16), "HostControl2"),
-        TraceLoggingHexInt32(READ_REGISTER_UCHAR(&m_registers->TimeoutControl), "TimeoutControl"));
+    LogInfo("ResetHw");
     return STATUS_SUCCESS;
 }
 
@@ -948,16 +994,17 @@ SlotExtension::ResetHost(SDPORT_RESET_TYPE resetType)
     switch (resetType)
     {
     case SdResetTypeAll:
-        // BRCME88C TODO: Should probably reset regulator to v3.3 here.
-        // Unfortunately, calling RPIQ here causes deadlock in some code paths.
         resetReg.ResetForAll = true;
         break;
+
     case SdResetTypeCmd:
         resetReg.ResetForCmdLine = true;
         break;
+
     case SdResetTypeDat:
         resetReg.ResetForDatLine = true;
         break;
+
     default:
         LogError("ResetHost-BadType",
             TraceLoggingUInt32(resetType, "ResetType"));
@@ -986,9 +1033,17 @@ SlotExtension::ResetHost(SDPORT_RESET_TYPE resetType)
 
     WRITE_REGISTER_UCHAR(&m_registers->TimeoutControl, DataTimeoutCounterValue);
 
+    // Host's Signaling1_8 register should match voltage regulator state.
+    if (m_regulatorVoltage1_8)
+    {
+        SdRegHostControl2 hostControl2(READ_REGISTER_USHORT(&m_registers->HostControl2.U16));
+        hostControl2.Signaling1_8 = m_regulatorVoltage1_8;
+        WRITE_REGISTER_USHORT(&m_registers->HostControl2.U16, hostControl2.U16);
+    }
+
     LogInfo("ResetHost",
         TraceLoggingUInt32(resetType, "ResetType"),
-        TraceLoggingHexInt8(READ_REGISTER_UCHAR((UCHAR*)&m_registers->SoftwareReset), "SoftwareReset"),
+        TraceLoggingHexInt8(READ_REGISTER_UCHAR(&m_registers->SoftwareReset.U8), "SoftwareReset"),
         TraceLoggingHexInt32(READ_REGISTER_ULONG(&m_registers->PresentState.U32), "PresentState"),
         TraceLoggingHexInt32(READ_REGISTER_UCHAR(&m_registers->HostControl1.U8), "HostControl1"),
         TraceLoggingHexInt32(READ_REGISTER_USHORT(&m_registers->HostControl2.U16), "HostControl2"));
@@ -1342,7 +1397,7 @@ SlotExtension::SetSignalingVoltage(SDPORT_SIGNALING_VOLTAGE signalingVoltage)
     bool const oldRegulatorVoltage1_8 = m_regulatorVoltage1_8;
     if (signaling1_8 != m_regulatorVoltage1_8)
     {
-        NTSTATUS status = SetRegulatorVoltage1_8(signaling1_8);
+        NTSTATUS status = InvokeSetRegulatorVoltage1_8(signaling1_8);
         if (!NT_SUCCESS(status))
         {
             LogError("SetSignalingVoltage-SetGpio4",
@@ -1368,7 +1423,7 @@ SlotExtension::SetSignalingVoltage(SDPORT_SIGNALING_VOLTAGE signalingVoltage)
         // BRCME88C: Restore voltage regulator to original state.
         if (oldRegulatorVoltage1_8 != m_regulatorVoltage1_8)
         {
-            SetRegulatorVoltage1_8(oldRegulatorVoltage1_8);
+            InvokeSetRegulatorVoltage1_8(oldRegulatorVoltage1_8);
         }
 
         return STATUS_UNSUCCESSFUL;
@@ -1389,7 +1444,7 @@ SlotExtension::SetSignalingVoltage(SDPORT_SIGNALING_VOLTAGE signalingVoltage)
         // BRCME88C: Restore voltage regulator to original state.
         if (oldRegulatorVoltage1_8 != m_regulatorVoltage1_8)
         {
-            SetRegulatorVoltage1_8(oldRegulatorVoltage1_8);
+            InvokeSetRegulatorVoltage1_8(oldRegulatorVoltage1_8);
         }
 
         return STATUS_UNSUCCESSFUL;

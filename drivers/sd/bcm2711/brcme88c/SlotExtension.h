@@ -111,9 +111,19 @@ public:
 
 private:
 
-    _IRQL_requires_max_(APC_LEVEL)
+    _IRQL_requires_(PASSIVE_LEVEL)
     NTSTATUS CODE_SEG_PAGE
     SetRegulatorVoltage1_8(bool regulatorVoltage1_8);
+
+    _IRQL_requires_max_(PASSIVE_LEVEL)
+    _IRQL_requires_same_
+    _Function_class_(WORKER_THREAD_ROUTINE)
+    static void CODE_SEG_PAGE
+    InvokeSetRegulatorVoltageWorker(void* parameter);
+
+    _IRQL_requires_max_(APC_LEVEL)
+    NTSTATUS CODE_SEG_PAGE
+    InvokeSetRegulatorVoltage1_8(bool regulatorVoltage1_8);
 
     _IRQL_requires_max_(HIGH_LEVEL)
     void CODE_SEG_TEXT
@@ -181,5 +191,6 @@ private:
     PHYSICAL_ADDRESS m_physicalBase;
     bool m_crashDumpMode;
     bool m_regulatorVoltage1_8;
+    WORK_QUEUE_ITEM m_rpiqWorkItem;
     SDPORT_CAPABILITIES m_capabilities;
 };

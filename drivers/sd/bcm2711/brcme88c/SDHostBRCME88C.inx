@@ -3,7 +3,6 @@ Signature="$Windows NT$"
 Class=SDHost
 ClassGUID={a0a588a4-c46f-4b37-b7ea-c82fe89870c6}
 Provider=%ProviderString%
-DriverVer=04/02/2015,10.0.10053
 CatalogFile=SDHostBRCME88C.cat
 PnpLockdown=1
 
