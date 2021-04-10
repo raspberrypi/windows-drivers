@@ -455,11 +455,7 @@ SdhcSlotInitialize (
     SdhcExtension->OutstandingRequest = NULL;
 
     //
-    // Enable all interrupt signals from controller to the OS,
-    // but mask all.
-    // Means we are only using SDHC_INTERRUPT_ERROR_STATUS_ENABLE to
-    // control interrupts, this way disabled events do not get reflected
-    // in the status register.
+    // Disable interrupts until we're ready to handle them.
     //
 
     SdhcWriteRegisterUlong(SdhcExtension,
@@ -467,7 +463,7 @@ SdhcSlotInitialize (
                            0);
     SdhcWriteRegisterUlong(SdhcExtension,
                            SDHC_INTERRUPT_ERROR_SIGNAL_ENABLE,
-                           SDHC_ALL_EVENTS);
+                           0);
 
     return STATUS_SUCCESS;
 } // SdhcSlotInitialize (...)
