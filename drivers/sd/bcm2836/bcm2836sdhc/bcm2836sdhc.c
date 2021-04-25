@@ -455,7 +455,9 @@ SdhcSlotInitialize (
     SdhcExtension->OutstandingRequest = NULL;
 
     //
-    // Disable interrupts until we're ready to handle them.
+    // Disable interrupts until we're ready to handle them. No need to have
+    // them enabled yet, and some versions of sdport.sys crash if any
+    // interrupts come at this point.
     //
 
     SdhcWriteRegisterUlong(SdhcExtension,
