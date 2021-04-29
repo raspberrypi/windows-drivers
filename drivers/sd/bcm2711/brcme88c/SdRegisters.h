@@ -90,6 +90,18 @@ enum SdRegCommandType : UCHAR
     SdRegCommandTypeAbort,
 };
 
+enum SdRegDmaAction : unsigned
+{
+    SdRegDmaActionAdma2Nop = 0,
+    SdRegDmaActionAdma2Rsv = 2,
+    SdRegDmaActionAdma2Tran = 4,
+    SdRegDmaActionAdma2Link = 6,
+    SdRegDmaActionAdma3CmdSD = 1,
+    SdRegDmaActionAdma3CmdUHS2 = 3,
+    SdRegDmaActionAdma3Reserved = 5,
+    SdRegDmaActionAdma3IntegratedDescriptor = 7,
+};
+
 union SdRegPowerControl
 {
     explicit constexpr
@@ -432,7 +444,8 @@ struct SdRegisters
     UINT8 AdmaErrorStatus;              // 54
     UINT8 Reserved55;                   // 55
     UINT16 Reserved56;                  // 56
-    UINT64 AdmaSystemAddress;           // 58
+    ULONG AdmaSystemAddress;            // 58
+    ULONG AdmaSystemAddressHigh;        // 5C
     UINT16 PresetValue16s[8];           // 60
     ULONG Reserved70[32];               // 70 - ADMA3, UHS-II, vendor-specific stuff.
     ULONG ReservedF0[3];                // F0
@@ -441,3 +454,21 @@ struct SdRegisters
     UINT8 VendorVersion;                // FF
 };
 static_assert(sizeof(SdRegisters) == 0x100, "SdRegisters");
+
+// Descriptor for 32-bit addresses.
+union SdRegDma32
+{
+    UINT64 U64;
+    ULONG U32s[2];
+    struct
+    {
+        unsigned Valid : 1;
+        unsigned End : 1;
+        unsigned Int : 1;
+        SdRegDmaAction Action : 3;
+        unsigned LengthHigh : 10; // ADMA3
+        unsigned Length : 16;
+        UINT32 Address;
+    };
+};
+static_assert(sizeof(SdRegDma32) == 8, "SdRegDma32");

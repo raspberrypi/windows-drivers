@@ -11,9 +11,10 @@ as a reference.
 
 ## TODO
 
-- Regulator voltage should be set to 3.3v during ResetHw, but that leads to
-  deadlock with current RPIQ driver. This means the driver will be incompatible
-  with some SD cards that are UHS-capabile but not LV-compliant.
-- DMA. (via a bounce buffer)
-- Driver crashes if unloaded. Appears to be a bug in sdport.sys.
-- Tuning? (required to support UHS-SDR50)
+- If both bcm2836sdhc and this driver are loaded and one is unloaded, the
+  system will eventually crash. Appears to be a bug in sdport.sys's interrupt
+  handling (the Arasan and eMMC2 controllers share an interrupt vector).
+- Regulator voltage cannot be controlled while in crashdump mode.
+- Tuning? (required to support UHS-SDR50, but I'm not sure if that's useful)
+- Testing - make sure the DMA never corrupts data, test in crashdump mode.
+- Figure out how to get this driver into SafeOS for Windows Update.

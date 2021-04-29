@@ -84,7 +84,8 @@ DriverCleanupNormal(
     SD_MINIPORT* miniport)
 {
     PAGED_CODE();
-    UNREFERENCED_PARAMETER(miniport);
+
+    DriverCleanupCrashdump(miniport);
 
     LogInfo("DriverCleanup");
     DriverExitNormal();
@@ -96,7 +97,16 @@ DriverCleanupCrashdump(
     SD_MINIPORT* miniport)
 {
     PAGED_CODE();
-    UNREFERENCED_PARAMETER(miniport);
+
+    for (UCHAR i = 0; i != miniport->SlotCount; i++)
+    {
+        auto pSlot = miniport->SlotExtensionList[i];
+        if (pSlot != NULL)
+        {
+            auto pSlotExtension = reinterpret_cast<SlotExtension*>(pSlot->PrivateExtension);
+            pSlotExtension->SlotCleanup();
+        }
+    }
 }
 
 _Use_decl_annotations_ extern "C" // = PASSIVE_LEVEL
@@ -207,10 +217,10 @@ DriverPoFxPowerControlCallback(
     SD_MINIPORT* miniport,
     GUID const* powerControlCode,
     void* inputBuffer,
-    size_t inputBufferSize,
+    SIZE_T inputBufferSize,
     void* outputBuffer,
-    size_t outputBufferSize,
-    size_t* bytesReturned)
+    SIZE_T outputBufferSize,
+    SIZE_T* bytesReturned)
 {
     UNREFERENCED_PARAMETER(miniport);
     UNREFERENCED_PARAMETER(powerControlCode);

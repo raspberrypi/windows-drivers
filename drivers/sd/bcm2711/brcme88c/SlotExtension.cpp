@@ -26,15 +26,72 @@ SOFTWARE.
 #include "trace.h"
 #include "SdRegisters.h"
 
-struct DmaDescriptor
-{
-    // DMA-TODO
-};
+static unsigned constexpr GpioExpanderOffset = 128;
+static unsigned constexpr SignalingVoltageGpio = 4 + GpioExpanderOffset;
 
-static constexpr SdRegNormalInterrupts
+static unsigned constexpr RetryMaxCount = 100u;
+static unsigned constexpr RetryWaitMicroseconds = 1000u;
+
+static unsigned constexpr ClockWaitMicroseconds = 10u * 1000u;
+static unsigned constexpr SignallingWaitMicroseconds = 5u * 1000u;
+
+// 14 = slowest possible timeout clock.
+static unsigned constexpr DataTimeoutCounterValue = 14u;
+
+static UINT8 constexpr MaximumOutstandingRequests = 1;
+
+_IRQL_requires_max_(HIGH_LEVEL)
+static constexpr __forceinline
+SdRegNormalInterrupts
 EventMaskToInterruptMask(ULONG eventMask)
 {
     return SdRegNormalInterrupts(static_cast<UINT16>(eventMask & 0xFFFF));
+}
+
+_IRQL_requires_max_(DISPATCH_LEVEL)
+static __forceinline
+void
+FreeDmaMdl(_Pre_notnull_ __drv_freesMem(Mem) MDL* pDmaMdl)
+{
+    MmFreePagesFromMdl(pDmaMdl);
+    ExFreePool(pDmaMdl);
+}
+
+_IRQL_requires_max_(HIGH_LEVEL)
+static __forceinline
+UINT32
+PfnToLegacyMasterAddress(PFN_NUMBER pfn)
+{
+    NT_ASSERT(pfn < 0x3FFFFFFF / PAGE_SIZE);
+    return static_cast<UINT32>(pfn) * PAGE_SIZE + 0xC0000000;
+}
+
+_IRQL_requires_max_(HIGH_LEVEL)
+static constexpr __forceinline
+LARGE_INTEGER
+MakeLargeInteger(ULONG value32)
+{
+    LARGE_INTEGER li = {};
+    li.LowPart = value32;
+    return li;
+}
+
+static constexpr LARGE_INTEGER LargeInteger0 = MakeLargeInteger(0x0);
+static constexpr LARGE_INTEGER LargeIntegerPageSize = MakeLargeInteger(PAGE_SIZE);
+static constexpr LARGE_INTEGER LargeInteger3FFFFFFF = MakeLargeInteger(0x3FFFFFFF);
+
+_Use_decl_annotations_ // = PASSIVE_LEVEL
+void CODE_SEG_PAGE
+SlotExtension::SlotCleanup()
+{
+    PAGED_CODE();
+    NT_ASSERT(m_magic == 0xE88C);
+
+    FreeDmaBuffers();
+
+    LogInfo("SlotCleanup",
+        TraceLoggingPointer((void*)m_registers, "Registers"));
+    m_magic = 0xDEAD;
 }
 
 _Use_decl_annotations_ // = PASSIVE_LEVEL
@@ -47,6 +104,10 @@ SlotExtension::SlotInitialize(
 {
     // Similar sample code: SdhcSlotInitialize
     PAGED_CODE();
+    UNREFERENCED_PARAMETER(physicalBase);
+    NT_ASSERT(m_magic == 0);
+
+    NTSTATUS status;
 
     memset(this, 0, sizeof(*this));
 
@@ -57,13 +118,25 @@ SlotExtension::SlotInitialize(
         return STATUS_NOT_SUPPORTED;
     }
 
+    // Preallocate DMA buffers based on expected maximum transfer size.
+    // In crashdump mode, transfers are currently limited to 64KB.
+    // In normal mode, transfers are currently limited to 1MB.
+    status = AllocateDmaBuffers(crashdumpMode ? 0x10000 : 0x100000);
+    if (!NT_SUCCESS(status))
+    {
+        LogError("SlotInitialize-AllocateDmaBuffers",
+            TraceLoggingNTStatus(status));
+        return status;
+    }
+
     m_registers = static_cast<SdRegisters*>(virtualBase);
-    m_physicalBase = physicalBase;
+    m_magic = 0xE88C;
     m_crashDumpMode = crashdumpMode != 0;
     m_regulatorVoltage1_8 = false;
 
     // BRCME88C: Voltage regulator control.
     bool const driverRpiqIsAvailable = DriverRpiqIsAvailable();
+    SdRegHostControl2 const oldHostControl2(READ_REGISTER_USHORT(&m_registers->HostControl2.U16));
     ULONG oldSignalingVoltageGpioState = 98; // 98 = Dummy "RPIQ not available" flag
     if (driverRpiqIsAvailable)
     {
@@ -108,20 +181,27 @@ SlotExtension::SlotInitialize(
         ? 0
         : 1 << (regCaps.TimerCountForReTuning - 1);
 
-    m_capabilities.DmaDescriptorSize = sizeof(DmaDescriptor);
+    m_capabilities.DmaDescriptorSize = sizeof(SdRegDma32);
 
     m_capabilities.AlignmentRequirement =
         regCaps.SystemAddress64BitV3 ? 7 : 3;
 
     m_capabilities.PioTransferMaxThreshold = 64;
 
-    // BRCME88C: 1.8v available only if RPIQ driver online.
-    bool const signalingVoltage18V = regCaps.DDR50 != 0 && driverRpiqIsAvailable;
+    bool const signalingVoltage18V = regCaps.DDR50 != 0
+        && driverRpiqIsAvailable; // BRCME88C: 1.8v requires RPIQ driver.
 
-    m_capabilities.Supported.ScatterGatherDma = false; // DMA-TODO: regCaps.Adma2 != 0;
+    // BRCME88C: The Raspberry Pi's "ACPI bus" doesn't play nice with the Windows
+    // DMA system. Setting ScatterGatherDma = true means sdport will try to set up
+    // Windows-style DMA for us which is just a waste of time. Setting
+    // ScatterGatherDma = false means sdport will skip that setup and always
+    // request a "PIO" transfer. We can then implement the "PIO" transfer as PIO
+    // or DMA as appropriate.
+    m_capabilities.Supported.ScatterGatherDma = false; // regCaps.Adma2 != 0;
+
     m_capabilities.Supported.Address64Bit = regCaps.SystemAddress64BitV3 != 0;
 
-    // BRCME88C: Capabilities are wrong.
+    // BRCME88C: Capabilities are wrong - we only have 4 data pins.
     m_capabilities.Supported.BusWidth8Bit = false; // regCaps.DeviceBus8Bit != 0;
 
     m_capabilities.Supported.HighSpeed = regCaps.HighSpeed != 0;
@@ -165,12 +245,16 @@ SlotExtension::SlotInitialize(
     m_capabilities.Flags.UsePioForWrite = true;
     m_capabilities.Flags.Reserved = 0;
 
+    // Start with interrupts disabled.
+    SlotToggleEvents(0xFFFF, false);
+
     LogInfo("SlotInitialize",
         TraceLoggingUInt16(m_capabilities.SpecVersion, "SpecVersion"),
         TraceLoggingHexUInt8Array((UINT8*)&maxCurrents, 4, "Vdd1Max"),
         TraceLoggingHexInt64(regCaps.U64, "Capabilities"),
-        TraceLoggingPointer((void*)m_registers, "Registers"),
-        TraceLoggingUInt32(oldSignalingVoltageGpioState, "OldRegulator"));
+        TraceLoggingHexInt16(oldHostControl2.U16, "OldHostControl2"),
+        TraceLoggingUInt32(oldSignalingVoltageGpioState, "OldRegulator"),
+        TraceLoggingPointer((void*)m_registers, "Registers"));
     return STATUS_SUCCESS;
 }
 
@@ -366,10 +450,12 @@ SlotExtension::SlotIssueRequest(
         switch (request->Command.TransferMethod)
         {
         case SdTransferMethodPio:
-            status = StartPioTransfer(request);
+            status = m_dmaInProgress != SdTransferDirectionUndefined
+                ? StartDmaTransfer(request)
+                : StartPioTransfer(request);
             break;
         case SdTransferMethodSgDma:
-            status = StartDmaTransfer(request);
+            status = StartSgDmaTransfer(request);
             break;
         default:
             LogError("IssueRequest-BadMethod",
@@ -605,6 +691,144 @@ SlotExtension::SlotRestoreContext()
     return;
 }
 
+_Use_decl_annotations_ // <= DISPATCH_LEVEL
+void CODE_SEG_TEXT
+SlotExtension::FreeDmaBuffers()
+{
+    if (m_pDmaDataMdl)
+    {
+        FreeDmaMdl(m_pDmaDataMdl);
+        m_pDmaDataMdl = nullptr;
+    }
+
+    if (m_pDmaDescriptorMdl)
+    {
+        FreeDmaMdl(m_pDmaDescriptorMdl);
+        m_pDmaDescriptorMdl = nullptr;
+    }
+
+    LogInfo("FreeDmaBuffers");
+}
+
+_Use_decl_annotations_ // <= DISPATCH_LEVEL
+NTSTATUS CODE_SEG_TEXT
+SlotExtension::AllocateDmaBuffers(ULONG cbDmaData)
+{
+    NT_ASSERT(cbDmaData > 0);
+    NT_ASSERT(cbDmaData < 0x10000000);
+
+    NTSTATUS status;
+    MDL* pDmaDataMdl = nullptr;
+    MDL* pDmaDescriptorMdl = nullptr;
+    ULONG const cDmaDataPages = (cbDmaData + PAGE_SIZE - 1) / PAGE_SIZE;
+    SdRegDma32* pDescriptors;
+    PFN_NUMBER* pPfns;
+
+    pDmaDataMdl = MmAllocatePagesForMdlEx(
+        LargeInteger0,        // LowAddress
+        LargeInteger3FFFFFFF, // HighAddress
+        LargeIntegerPageSize, // SkipBytes
+        cDmaDataPages * static_cast<size_t>(PAGE_SIZE),
+        MmCached,
+        MM_ALLOCATE_FULLY_REQUIRED | MM_ALLOCATE_PREFER_CONTIGUOUS | MM_DONT_ZERO_ALLOCATION);
+    if (!pDmaDataMdl ||
+        !MmGetSystemAddressForMdlSafe(pDmaDataMdl, HighPagePriority | MdlMappingNoExecute))
+    {
+        LogError("AllocateDmaBuffers-Data",
+            TraceLoggingUInt32(cbDmaData));
+        status = STATUS_INSUFFICIENT_RESOURCES;
+        goto Done;
+    }
+
+    pDmaDescriptorMdl = MmAllocatePagesForMdlEx(
+        LargeInteger0,        // LowAddress
+        LargeInteger3FFFFFFF, // HighAddress
+        LargeInteger0,        // SkipBytes
+        ROUND_TO_PAGES(cDmaDataPages * sizeof(SdRegDma32)),
+        MmCached,
+        MM_ALLOCATE_FULLY_REQUIRED | MM_ALLOCATE_REQUIRE_CONTIGUOUS_CHUNKS);
+    if (!pDmaDescriptorMdl ||
+        !MmGetSystemAddressForMdlSafe(pDmaDescriptorMdl, HighPagePriority | MdlMappingNoExecute))
+    {
+        LogError("AllocateDmaBuffers-Descriptor",
+            TraceLoggingUInt32(cbDmaData));
+        status = STATUS_INSUFFICIENT_RESOURCES;
+        goto Done;
+    }
+
+    NT_ASSERT(MmGetMdlByteOffset(pDmaDataMdl) == 0);
+    NT_ASSERT(MmGetSystemAddressForMdlSafe(pDmaDataMdl, 0) == pDmaDataMdl->MappedSystemVa);
+    NT_ASSERT(MmGetMdlByteOffset(pDmaDescriptorMdl) == 0);
+    NT_ASSERT(MmGetSystemAddressForMdlSafe(pDmaDescriptorMdl, 0) == pDmaDescriptorMdl->MappedSystemVa);
+
+    pDescriptors = static_cast<SdRegDma32*>(pDmaDescriptorMdl->MappedSystemVa);
+    pPfns = MmGetMdlPfnArray(pDmaDataMdl);
+    for (ULONG i = 0; i != cDmaDataPages; i += 1)
+    {
+        NT_ASSERT(pPfns[i] < (0x40000000 / PAGE_SIZE));
+        auto& desc = pDescriptors[i];
+        desc.Valid = true;
+        desc.End = false;
+        desc.Int = false;
+        desc.Action = SdRegDmaActionAdma2Tran;
+        desc.LengthHigh = 0;
+        desc.Length = PAGE_SIZE;
+        desc.Address = PfnToLegacyMasterAddress(pPfns[i]);
+    }
+
+    pDescriptors[0].End = true;
+    m_iDmaEndDescriptor = 0;
+
+    FreeDmaBuffers();
+
+    m_pDmaDataMdl = pDmaDataMdl;
+    m_pDmaDescriptorMdl = pDmaDescriptorMdl;
+    pDmaDataMdl = nullptr;
+    pDmaDescriptorMdl = nullptr;
+
+    LogInfo("AllocateDmaBuffers",
+        TraceLoggingUInt32(cbDmaData));
+    status = STATUS_SUCCESS;
+
+Done:
+
+    if (pDmaDataMdl)
+    {
+        FreeDmaMdl(pDmaDataMdl);
+    }
+
+    if (pDmaDescriptorMdl)
+    {
+        FreeDmaMdl(pDmaDescriptorMdl);
+    }
+
+    return status;
+}
+
+_Use_decl_annotations_ // <= DISPATCH_LEVEL
+bool CODE_SEG_TEXT
+SlotExtension::CommandShouldUseDma(SDPORT_COMMAND const& command)
+{
+    bool useDma;
+
+    if (command.Length <= m_capabilities.PioTransferMaxThreshold)
+    {
+        useDma = false;
+    }
+    else if (command.Length <= MmGetMdlByteCount(m_pDmaDataMdl))
+    {
+        useDma = true;
+    }
+    else
+    {
+        // Unusual - unexpectedly large transfer request.
+        // Try to reallocate. Use PIO if reallocation fails.
+        useDma = NT_SUCCESS(AllocateDmaBuffers(command.Length));
+    }
+
+    return useDma;
+}
+
 _Use_decl_annotations_ // = PASSIVE_LEVEL
 NTSTATUS CODE_SEG_PAGE
 SlotExtension::SetRegulatorVoltage1_8(bool regulatorVoltage1_8)
@@ -716,6 +940,8 @@ SlotExtension::SendCommand(_Inout_ SDPORT_REQUEST* request)
     SdRegTransferMode transferMode(0);
     SdRegNormalInterrupts requiredEvents(0);
 
+    m_dmaInProgress = SdTransferDirectionUndefined;
+
     NT_ASSERT(
         request->Type == SdRequestTypeCommandNoTransfer ||
         request->Type == SdRequestTypeCommandWithTransfer);
@@ -799,23 +1025,59 @@ SlotExtension::SendCommand(_Inout_ SDPORT_REQUEST* request)
         {
         case SdTransferMethodPio:
 
-            switch (request->Command.TransferDirection)
+            if (CommandShouldUseDma(request->Command))
             {
-            case SdTransferDirectionRead:
-                requiredEvents.BufferReadReady = true;
-                break;
-            case SdTransferDirectionWrite:
-                requiredEvents.BufferWriteReady = true;
-                break;
-            default:
-                LogError("SendCommand-BadTransferDirection",
-                    TraceLoggingUInt32(request->Command.TransferDirection, "TransferDirection"));
-                return STATUS_NOT_SUPPORTED;
+                auto const pDescriptors = static_cast<SdRegDma32*>(m_pDmaDescriptorMdl->MappedSystemVa);
+
+                // Clean up the transfer-end descriptor from previous DMA.
+                pDescriptors[m_iDmaEndDescriptor].End = false;
+                pDescriptors[m_iDmaEndDescriptor].Length = PAGE_SIZE;
+
+                // Set up the transfer-end descriptor for this DMA.
+                m_iDmaEndDescriptor = (request->Command.Length - 1) / PAGE_SIZE;
+                pDescriptors[m_iDmaEndDescriptor].End = true;
+                pDescriptors[m_iDmaEndDescriptor].Length = request->Command.Length - (m_iDmaEndDescriptor * PAGE_SIZE);
+
+                transferMode.DmaEnable = true;
+                requiredEvents.TransferComplete = true;
+
+                if (transferMode.DataTransferDirectionRead)
+                {
+                    m_dmaInProgress = SdTransferDirectionRead;
+                }
+                else
+                {
+                    m_dmaInProgress = SdTransferDirectionWrite;
+                    memcpy(m_pDmaDataMdl->MappedSystemVa, request->Command.DataBuffer, request->Command.Length);
+                }
+
+                KeFlushIoBuffers(m_pDmaDescriptorMdl, true, true);
+                KeFlushIoBuffers(m_pDmaDataMdl, transferMode.DataTransferDirectionRead, true);
+
+                auto pfn = MmGetMdlPfnArray(m_pDmaDescriptorMdl)[0];
+                WRITE_REGISTER_ULONG(&m_registers->AdmaSystemAddress, PfnToLegacyMasterAddress(pfn));
+            }
+            else
+            {
+                switch (request->Command.TransferDirection)
+                {
+                case SdTransferDirectionRead:
+                    requiredEvents.BufferReadReady = true;
+                    break;
+                case SdTransferDirectionWrite:
+                    requiredEvents.BufferWriteReady = true;
+                    break;
+                default:
+                    LogError("SendCommand-BadTransferDirection",
+                        TraceLoggingUInt32(request->Command.TransferDirection, "TransferDirection"));
+                    return STATUS_NOT_SUPPORTED;
+                }
             }
 
             break;
 
         case SdTransferMethodSgDma:
+            // BRCME88C: DMA transfers are done with TransferMethod == SdTransferMethodPio.
             //requiredEvents.TransferComplete = true;
 
         default:
@@ -967,11 +1229,37 @@ _Use_decl_annotations_ // = DISPATCH_LEVEL
 NTSTATUS CODE_SEG_TEXT
 SlotExtension::StartDmaTransfer(SDPORT_REQUEST* request)
 {
+    NT_ASSERT(request->Type == SdRequestTypeStartTransfer);
+    NT_ASSERT(request->Command.TransferMethod == SdTransferMethodPio);
+
+    // BRCME88C: DMA transfers are done with TransferMethod == SdTransferMethodPio.
+    // We started the DMA transfer during SendCommand.
+    // StartDmaTransfer gets called when the SendCommand completes,
+    // at which point the DMA transfer is also complete.
+
+    if (m_dmaInProgress == SdTransferDirectionRead)
+    {
+        // TODO: Is there any buffer flushing that needs to happen here?
+        memcpy(request->Command.DataBuffer, m_pDmaDataMdl->MappedSystemVa, request->Command.Length);
+    }
+
+    m_dmaInProgress = SdTransferDirectionUndefined;
+    request->Status = STATUS_SUCCESS;
+    SdPortCompleteRequest(request, STATUS_SUCCESS);
+    return STATUS_SUCCESS;
+}
+
+_Use_decl_annotations_ // = DISPATCH_LEVEL
+NTSTATUS CODE_SEG_TEXT
+SlotExtension::StartSgDmaTransfer(SDPORT_REQUEST* request)
+{
     // Similar sample code: SdhcStartAdmaTransfer
 
-    LogError("StartDmaTransfer",
+    // BRCME88C: We don't use SdTransferMethodSgDma.
+    // DMA transfers are done with TransferMethod == SdTransferMethodPio.
+    LogError("StartSgDmaTransfer",
         TraceLoggingUInt32(request->Command.TransferDirection, "TransferDirection"));
-    return STATUS_NOT_IMPLEMENTED; // DMA-TODO
+    return STATUS_NOT_IMPLEMENTED;
 }
 
 _Use_decl_annotations_ // <= APC_LEVEL
@@ -1033,13 +1321,18 @@ SlotExtension::ResetHost(SDPORT_RESET_TYPE resetType)
 
     WRITE_REGISTER_UCHAR(&m_registers->TimeoutControl, DataTimeoutCounterValue);
 
-    // Host's Signaling1_8 register should match voltage regulator state.
+    // BRCME88C: Host's Signaling1_8 register should match voltage regulator state.
     if (m_regulatorVoltage1_8)
     {
         SdRegHostControl2 hostControl2(READ_REGISTER_USHORT(&m_registers->HostControl2.U16));
         hostControl2.Signaling1_8 = m_regulatorVoltage1_8;
         WRITE_REGISTER_USHORT(&m_registers->HostControl2.U16, hostControl2.U16);
     }
+
+    // BRCME88C: Always use 32-bit ADMA2.
+    SdRegHostControl1 hostControl1(READ_REGISTER_UCHAR(&m_registers->HostControl1.U8));
+    hostControl1.DmaSelect = SdRegDma32BitAdma2;
+    WRITE_REGISTER_UCHAR(&m_registers->HostControl1.U8, hostControl1.U8);
 
     LogInfo("ResetHost",
         TraceLoggingUInt32(resetType, "ResetType"),

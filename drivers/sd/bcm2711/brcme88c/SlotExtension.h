@@ -25,21 +25,11 @@ SOFTWARE.
 
 class SlotExtension
 {
-    static unsigned const GpioExpanderOffset = 128;
-    static unsigned const SignalingVoltageGpio = 4 + GpioExpanderOffset;
-
-    static UINT8 const MaximumOutstandingRequests = 1;
-
-    static auto const RetryMaxCount = 100u;
-    static auto const RetryWaitMicroseconds = 1000u;
-
-    static auto const ClockWaitMicroseconds = 10u * 1000u;
-    static auto const SignallingWaitMicroseconds = 5u * 1000u;
-
-    // 14 = slowest possible timeout clock.
-    static auto const DataTimeoutCounterValue = 14u;
-
 public:
+
+    _IRQL_requires_max_(PASSIVE_LEVEL)
+    void CODE_SEG_PAGE
+    SlotCleanup();
 
     _IRQL_requires_max_(PASSIVE_LEVEL)
     NTSTATUS CODE_SEG_PAGE
@@ -111,6 +101,18 @@ public:
 
 private:
 
+    _IRQL_requires_max_(DISPATCH_LEVEL)
+    void CODE_SEG_TEXT
+    FreeDmaBuffers();
+
+    _IRQL_requires_max_(DISPATCH_LEVEL)
+    NTSTATUS CODE_SEG_TEXT
+    AllocateDmaBuffers(ULONG cbDmaData);
+
+    _IRQL_requires_max_(DISPATCH_LEVEL)
+    bool CODE_SEG_TEXT
+    CommandShouldUseDma(SDPORT_COMMAND const& command);
+
     _IRQL_requires_(PASSIVE_LEVEL)
     NTSTATUS CODE_SEG_PAGE
     SetRegulatorVoltage1_8(bool regulatorVoltage1_8);
@@ -139,7 +141,11 @@ private:
 
     _IRQL_requires_(DISPATCH_LEVEL)
     NTSTATUS CODE_SEG_TEXT
-    StartDmaTransfer(_In_ SDPORT_REQUEST* request);
+    StartDmaTransfer(_Inout_ SDPORT_REQUEST* request);
+
+    _IRQL_requires_(DISPATCH_LEVEL)
+    NTSTATUS CODE_SEG_TEXT
+    StartSgDmaTransfer(_In_ SDPORT_REQUEST* request);
 
     _IRQL_requires_max_(APC_LEVEL)
     NTSTATUS CODE_SEG_PAGE
@@ -188,7 +194,11 @@ private:
 private:
 
     volatile SdRegisters* m_registers;
-    PHYSICAL_ADDRESS m_physicalBase;
+    MDL* m_pDmaDataMdl;
+    MDL* m_pDmaDescriptorMdl;
+    UINT32 m_iDmaEndDescriptor; // The index of the descriptor where End == true.
+    SDPORT_TRANSFER_DIRECTION m_dmaInProgress;
+    UINT16 m_magic;
     bool m_crashDumpMode;
     bool m_regulatorVoltage1_8;
     WORK_QUEUE_ITEM m_rpiqWorkItem;
