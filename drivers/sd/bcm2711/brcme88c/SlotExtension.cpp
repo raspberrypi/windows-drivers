@@ -85,13 +85,13 @@ void CODE_SEG_PAGE
 SlotExtension::SlotCleanup()
 {
     PAGED_CODE();
-    NT_ASSERT(m_magic == 0xE88C);
+    NT_ASSERT(m_magic == MagicValid);
 
     FreeDmaBuffers();
 
     LogInfo("SlotCleanup",
         TraceLoggingPointer((void*)m_registers, "Registers"));
-    m_magic = 0xDEAD;
+    m_magic = MagicPostCleanup;
 }
 
 _Use_decl_annotations_ // = PASSIVE_LEVEL
@@ -105,11 +105,19 @@ SlotExtension::SlotInitialize(
     // Similar sample code: SdhcSlotInitialize
     PAGED_CODE();
     UNREFERENCED_PARAMETER(physicalBase);
-    NT_ASSERT(m_magic == 0);
+    NT_ASSERT(m_magic == MagicPreInitialize);
+
+    enum GpioState : ULONG
+    {
+        GpioStateOff = 0,
+        GpioStateOn = 1,
+        GpioStateUnavailable = 7, // Arbitrary magic value for logging purposes.
+        GpioStateQueryFailed = 9, // Arbitrary magic value for logging purposes.
+    };
 
     NTSTATUS status;
 
-    memset(this, 0, sizeof(*this));
+    memset(this, 0, sizeof(*this)); // Probably already zeroed, but just to be sure.
 
     if (length < sizeof(SdRegisters))
     {
@@ -130,20 +138,20 @@ SlotExtension::SlotInitialize(
     }
 
     m_registers = static_cast<SdRegisters*>(virtualBase);
-    m_magic = 0xE88C;
+    m_magic = MagicValid;
     m_crashDumpMode = crashdumpMode != 0;
     m_regulatorVoltage1_8 = false;
 
     // BRCME88C: Voltage regulator control.
     bool const driverRpiqIsAvailable = DriverRpiqIsAvailable();
     SdRegHostControl2 const oldHostControl2(READ_REGISTER_USHORT(&m_registers->HostControl2.U16));
-    ULONG oldSignalingVoltageGpioState = 98; // 98 = Dummy "RPIQ not available" flag
+    ULONG oldSignalingVoltageGpioState = GpioStateUnavailable;
     if (driverRpiqIsAvailable)
     {
         // For informational purposes, get existing voltage state.
         MAILBOX_GET_SET_GPIO_EXPANDER info;
         INIT_MAILBOX_GET_GPIO_EXPANDER(&info, SignalingVoltageGpio);
-        info.GpioState = 99; // 99 = Dummy "RPIQ query failed" flag.
+        info.GpioState = GpioStateQueryFailed;
         DriverRpiqProperty(&info.Header);
         oldSignalingVoltageGpioState = info.GpioState;
 
@@ -483,7 +491,7 @@ SlotExtension::SlotGetResponse(
 {
     // Similar sample code: SdhcGetResponse
 
-    // TODO: AutoCmd responses are in high registers. Do we care?
+    // TODO? AutoCmd responses are in high registers. Do we care?
 
     UINT16 responseLength;
     switch (command.ResponseType)
@@ -724,6 +732,12 @@ SlotExtension::AllocateDmaBuffers(ULONG cbDmaData)
     SdRegDma32* pDescriptors;
     PFN_NUMBER* pPfns;
 
+    // DMA bounce buffer:
+    // - Must be in low 1GB of physical memory.
+    // - We need all of the pages we're asking for. Partial success is not ok.
+    // - We don't need them to be contiguous. Scattered pages are fine.
+    //   (Note: MM_ALLOCATE_PREFER_CONTIGUOUS is confusingly-named.)
+    // - After allocating the physical memory, map it into system address space.
     pDmaDataMdl = MmAllocatePagesForMdlEx(
         LargeInteger0,        // LowAddress
         LargeInteger3FFFFFFF, // HighAddress
@@ -740,6 +754,13 @@ SlotExtension::AllocateDmaBuffers(ULONG cbDmaData)
         goto Done;
     }
 
+    // DMA descriptor buffer:
+    // - Usually just one page (one page of descriptors can cover a 2MB transfer,
+    //   and sdport is currently limited to 1MB transfers).
+    // - Must be in low 1GB of physical memory.
+    // - We need all of the pages we're asking for. Partial success is not ok.
+    // - We need the pages to be in contiguous physical memory.
+    // - After allocating the physical memory, map it into system address space.
     pDmaDescriptorMdl = MmAllocatePagesForMdlEx(
         LargeInteger0,        // LowAddress
         LargeInteger3FFFFFFF, // HighAddress
@@ -761,6 +782,7 @@ SlotExtension::AllocateDmaBuffers(ULONG cbDmaData)
     NT_ASSERT(MmGetMdlByteOffset(pDmaDescriptorMdl) == 0);
     NT_ASSERT(MmGetSystemAddressForMdlSafe(pDmaDescriptorMdl, 0) == pDmaDescriptorMdl->MappedSystemVa);
 
+    // Initialize our descriptor array to point at the pages in the DMA bounce buffer.
     pDescriptors = static_cast<SdRegDma32*>(pDmaDescriptorMdl->MappedSystemVa);
     pPfns = MmGetMdlPfnArray(pDmaDataMdl);
     for (ULONG i = 0; i != cDmaDataPages; i += 1)
@@ -776,9 +798,10 @@ SlotExtension::AllocateDmaBuffers(ULONG cbDmaData)
         desc.Address = PfnToLegacyMasterAddress(pPfns[i]);
     }
 
-    pDescriptors[0].End = true;
-    m_iDmaEndDescriptor = 0;
+    pDescriptors[0].End = true; // Set descriptor #0 as end-of-transfer.
+    m_iDmaEndDescriptor = 0;    // Remember that we set descriptor #0 as end-of-transfer.
 
+    // Free any previously-allocated buffers.
     FreeDmaBuffers();
 
     m_pDmaDataMdl = pDmaDataMdl;
@@ -810,6 +833,13 @@ bool CODE_SEG_TEXT
 SlotExtension::CommandShouldUseDma(SDPORT_COMMAND const& command)
 {
     bool useDma;
+
+    // PIO is slower per-byte, but DMA takes more time to set up each transfer.
+    // For small transfers, it's more efficient to use PIO.
+
+    // PERF-TODO: Measure overhead of PIO versus DMA to determine the transfer
+    // size where DMA becomes more efficient. Threshold is probably different for
+    // reads and writes.
 
     if (command.Length <= m_capabilities.PioTransferMaxThreshold)
     {
@@ -852,6 +882,7 @@ SlotExtension::SetRegulatorVoltage1_8(bool regulatorVoltage1_8)
     return status;
 }
 
+// Parameter for InvokeSetRegulatorVoltageWorker.
 struct SetRegulatorVoltageContext
 {
     SlotExtension* const slotExtension;
@@ -890,7 +921,8 @@ SlotExtension::InvokeSetRegulatorVoltage1_8(bool regulatorVoltage1_8)
         RPIQ requires caller to be running at PASSIVE_LEVEL.
 
         Some of the callers of this function could, in theory, be called at APC_LEVEL.
-        (It doesn't happen in practice right now, but perhaps it might change.)
+        (It doesn't happen in practice right now because SetSignalingVoltage is only
+        called at PASSIVE_LEVEL, but perhaps that might change in the future.)
 
         If this function is ever called at APC_LEVEL, we marshal the call onto a worker
         thread running at PASSIVE_LEVEL. Waiting at APC for PASSIVE work to complete is
@@ -902,8 +934,8 @@ SlotExtension::InvokeSetRegulatorVoltage1_8(bool regulatorVoltage1_8)
         KeInitializeEvent(&context.event, NotificationEvent, false);
         m_rpiqWorkItem = { {}, &InvokeSetRegulatorVoltageWorker, &context };
 
-        // ExQueueWorkItem is deprecated because IoAllocateWorkItem does better
-        // tracking. We don't need the tracking, and this has lower overhead.
+        // ExQueueWorkItem is deprecated because IoAllocateWorkItem does better diagnostic
+        // tracking. We don't care about the tracking and this has lower overhead.
 #pragma warning(suppress:4996)
         ExQueueWorkItem(&m_rpiqWorkItem, CriticalWorkQueue);
 
@@ -1041,21 +1073,26 @@ SlotExtension::SendCommand(_Inout_ SDPORT_REQUEST* request)
                 transferMode.DmaEnable = true;
                 requiredEvents.TransferComplete = true;
 
-                if (transferMode.DataTransferDirectionRead)
+                switch (request->Command.TransferDirection)
                 {
+                case SdTransferDirectionRead:
                     m_dmaInProgress = SdTransferDirectionRead;
-                }
-                else
-                {
+                    break;
+                case SdTransferDirectionWrite:
                     m_dmaInProgress = SdTransferDirectionWrite;
                     memcpy(m_pDmaDataMdl->MappedSystemVa, request->Command.DataBuffer, request->Command.Length);
+                    break;
+                default:
+                    LogError("SendCommand-BadTransferDirection",
+                        TraceLoggingUInt32(request->Command.TransferDirection, "TransferDirection"));
+                    return STATUS_NOT_SUPPORTED;
                 }
 
                 KeFlushIoBuffers(m_pDmaDescriptorMdl, true, true);
                 KeFlushIoBuffers(m_pDmaDataMdl, transferMode.DataTransferDirectionRead, true);
 
                 auto pfn = MmGetMdlPfnArray(m_pDmaDescriptorMdl)[0];
-                WRITE_REGISTER_ULONG(&m_registers->AdmaSystemAddress, PfnToLegacyMasterAddress(pfn));
+                WRITE_REGISTER_NOFENCE_ULONG(&m_registers->AdmaSystemAddress, PfnToLegacyMasterAddress(pfn));
             }
             else
             {
@@ -1106,11 +1143,11 @@ SlotExtension::SendCommand(_Inout_ SDPORT_REQUEST* request)
     requiredEvents.CommandComplete = true;
     InterlockedExchangeNoFence((long*)&request->RequiredEvents, requiredEvents.U16);
 
-    WRITE_REGISTER_ULONG(&m_registers->SdmaSystemAddress, 0);
-    WRITE_REGISTER_USHORT(&m_registers->BlockSize, request->Command.BlockSize);
-    WRITE_REGISTER_USHORT(&m_registers->BlockCount16, request->Command.BlockCount);
-    WRITE_REGISTER_ULONG(&m_registers->Argument, request->Command.Argument);
-    WRITE_REGISTER_USHORT(&m_registers->TransferMode.U16, transferMode.U16);
+    WRITE_REGISTER_NOFENCE_ULONG(&m_registers->SdmaSystemAddress, 0);
+    WRITE_REGISTER_NOFENCE_USHORT(&m_registers->BlockSize, request->Command.BlockSize);
+    WRITE_REGISTER_NOFENCE_USHORT(&m_registers->BlockCount16, request->Command.BlockCount);
+    WRITE_REGISTER_NOFENCE_ULONG(&m_registers->Argument, request->Command.Argument);
+    WRITE_REGISTER_NOFENCE_USHORT(&m_registers->TransferMode.U16, transferMode.U16);
 
     LogVerboseInfo("SendCommand",
         TraceLoggingUInt8(request->Command.Index, "CMD"),
@@ -1118,6 +1155,8 @@ SlotExtension::SendCommand(_Inout_ SDPORT_REQUEST* request)
         TraceLoggingHexInt16(command.U16, "CommandReg"),
         TraceLoggingHexInt16(transferMode.U16, "TransferMode"),
         TraceLoggingHexInt16(requiredEvents.U16, "RequiredEvents"));
+
+    // Need fence before starting command.
     WRITE_REGISTER_USHORT(&m_registers->Command.U16, command.U16);
 
     return STATUS_PENDING;
@@ -1233,13 +1272,13 @@ SlotExtension::StartDmaTransfer(SDPORT_REQUEST* request)
     NT_ASSERT(request->Command.TransferMethod == SdTransferMethodPio);
 
     // BRCME88C: DMA transfers are done with TransferMethod == SdTransferMethodPio.
-    // We started the DMA transfer during SendCommand.
-    // StartDmaTransfer gets called when the SendCommand completes,
+    // We actually started the DMA transfer during SendCommand.
+    // Sdport will call StartDmaTransfer when the SendCommand completes,
     // at which point the DMA transfer is also complete.
 
     if (m_dmaInProgress == SdTransferDirectionRead)
     {
-        // TODO: Is there any buffer flushing that needs to happen here?
+        // TODO? Is there any buffer flushing that needs to happen here?
         memcpy(request->Command.DataBuffer, m_pDmaDataMdl->MappedSystemVa, request->Command.Length);
     }
 
@@ -1266,6 +1305,8 @@ _Use_decl_annotations_ // <= APC_LEVEL
 NTSTATUS CODE_SEG_PAGE
 SlotExtension::ResetHw()
 {
+    // Distinction between ResetHw and ResetHost is unclear.
+    // We don't do anything here - it's all in ResetHost.
     PAGED_CODE();
     LogInfo("ResetHw");
     return STATUS_SUCCESS;
@@ -1322,6 +1363,8 @@ SlotExtension::ResetHost(SDPORT_RESET_TYPE resetType)
     WRITE_REGISTER_UCHAR(&m_registers->TimeoutControl, DataTimeoutCounterValue);
 
     // BRCME88C: Host's Signaling1_8 register should match voltage regulator state.
+    // Note that sdport currently seems to assume that the card and the controller will
+    // maintain the signaling voltage state across a ResetHw and ResetHost.
     if (m_regulatorVoltage1_8)
     {
         SdRegHostControl2 hostControl2(READ_REGISTER_USHORT(&m_registers->HostControl2.U16));
@@ -1368,7 +1411,7 @@ SlotExtension::SetClock(ULONG frequencyKhz)
         }
         else if (m_capabilities.SpecVersion < SdRegSpecVersion3)
         {
-            // SdReg 1.0 and 2.0 can divide by powers of 2 from 2..256.
+            // SdHost 1.0 and 2.0 can divide by powers of 2 from 2..256.
             // Could do fancy bit manipulation, but easier to just try 8 possibilities
             // and stop at the first one that meets our requirements.
 
@@ -1393,7 +1436,7 @@ SlotExtension::SetClock(ULONG frequencyKhz)
         }
         else
         {
-            // SdReg 3.0 and later can divide by any even value 2..2046.
+            // SdHost 3.0 and later can divide by any even value 2..2046.
 
             clockDivisor = m_capabilities.BaseClockFrequencyKhz / frequencyKhz;
             clockDivisor &= ~1u; // Only even values.

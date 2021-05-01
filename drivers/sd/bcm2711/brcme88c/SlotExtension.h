@@ -193,12 +193,19 @@ private:
 
 private:
 
-    volatile SdRegisters* m_registers;
+    enum Magic : UINT16
+    {
+        MagicPreInitialize = 0,
+        MagicValid = 0xE88C,
+        MagicPostCleanup = 0xDEAD,
+    };
+
+    volatile SdRegisters* m_registers; // Should only be accessed via READ_REGISTER/WRITE_REGISTER.
     MDL* m_pDmaDataMdl;
     MDL* m_pDmaDescriptorMdl;
     UINT32 m_iDmaEndDescriptor; // The index of the descriptor where End == true.
     SDPORT_TRANSFER_DIRECTION m_dmaInProgress;
-    UINT16 m_magic;
+    Magic m_magic;
     bool m_crashDumpMode;
     bool m_regulatorVoltage1_8;
     WORK_QUEUE_ITEM m_rpiqWorkItem;

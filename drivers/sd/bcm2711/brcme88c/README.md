@@ -9,12 +9,21 @@ Implemented using the
 [Microsoft SDHC driver sample](https://github.com/microsoft/Windows-driver-samples/tree/master/sd/miniport/sdhc)
 as a reference.
 
-## TODO
+## NOTES
 
 - If both bcm2836sdhc and this driver are loaded and one is unloaded, the
   system will eventually crash. Appears to be a bug in sdport.sys's interrupt
   handling (the Arasan and eMMC2 controllers share an interrupt vector).
-- Regulator voltage cannot be controlled while in crashdump mode.
-- Tuning? (required to support UHS-SDR50, but I'm not sure if that's useful)
-- Testing - make sure the DMA never corrupts data, test in crashdump mode.
+  - Possible workaround: Don't use both bcm2836sdhc and this driver.
+  - Possible workaround: Don't unload drivers.
+
+## TODO
+
+- Regulator voltage cannot be controlled while in crashdump mode. Possible fix
+  would be to have mailbox support via ACPI method instead of via RPIQ driver.
+- Does not support UHS-SDR50 because we don't support tuning.
+  - Would be easy to implement, but I'm not sure SDR50 is needed.
+- Could use some performance testing to determine which transfers should use
+  PIO and which transfers should use DMA.
+- Needs testing in various scenarios, e.g. crashdump mode.
 - Figure out how to get this driver into SafeOS for Windows Update.
