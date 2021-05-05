@@ -30,7 +30,7 @@ There are two drivers available for the **EMMC2** controller.
     because it can use DMA and can use 50 MB/s transfer speeds.
   - Disadvantage: `SDHostBRCME88C.sys` is probably less reliable than
     `sdbus.sys`. `SDHostBRCME88C.sys` is new and not yet fully tested, plus
-    `sdbus.sys` is not as well maintained by Microsoft and has some known
+    `sdport.sys` is not as well-maintained by Microsoft and has some known
     issues.
 
 For now, most users will probably want to use the `bcm2711\bcmemmc2` driver

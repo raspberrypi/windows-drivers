@@ -22,6 +22,9 @@ SOFTWARE.
 
 #pragma once
 
+// Based on PartA2_SD Host_Controller_Simplified_Specification_Ver4.20.pdf
+// from https://www.sdcard.org/downloads/pls/pdf/
+
 enum SdRegSpecVersion : UINT8
 {
     SdRegSpecVersion1 = 0,
