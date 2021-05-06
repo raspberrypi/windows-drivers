@@ -1,0 +1,81 @@
+[Version]
+Signature="$Windows NT$"
+Class=SDHost
+ClassGUID={a0a588a4-c46f-4b37-b7ea-c82fe89870c6}
+Provider=%ProviderString%
+CatalogFile=SDHostBRCME88C.cat
+PnpLockdown=1
+
+[SourceDisksNames]
+1 = Disk
+
+[SourceDisksFiles]
+SDHostBRCME88C.sys = 1
+
+[Manufacturer]
+%RPI%=RPI,NT$ARCH$
+
+[ControlFlags]
+BasicDriverOk=*
+ExcludeFromSelect=*
+
+[RPI.NT$ARCH$]
+%ACPI\BRCME88C.DeviceDesc%=SDHostBRCME88C, ACPI\BRCME88C
+
+[SDHostBRCME88C]
+CopyFiles=SDHostBRCME88C_CopyFiles
+AddReg=SDHostBRCME88C_Reg
+
+[SDHostBRCME88C_CopyFiles]
+SDHostBRCME88C.sys
+
+[DestinationDirs]
+SDHostBRCME88C_CopyFiles=12
+
+[SDHostBRCME88C.HW]
+AddReg=SDHostBRCME88C_LocationReg
+
+[SDHostBRCME88C.Services]
+AddService = SDHostBRCME88C, 2, SDHostBRCME88C_ServiceInst
+
+; Service install
+[SDHostBRCME88C_ServiceInst]
+ServiceType    = 1 ; SERVICE_KERNEL_DRIVER
+StartType      = 3 ; SERVICE_DEMAND_START
+ErrorControl   = 1 ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %12%\SDHostBRCME88C.sys
+LoadOrderGroup = System Bus Extender
+AddReg         = SDHostBRCME88C_ServiceReg
+
+; Registry keys
+
+[SDHostBRCME88C_Reg]
+HKR,,Driver,,"SDHostBRCME88C.sys"
+
+[SDHostBRCME88C_LocationReg]
+HKR,,UINumberDescFormat,,%SDHostBRCME88C_Slot%
+
+[SDHostBRCME88C_ServiceReg]
+HKR,,BootFlags,0x00010003,0x00000008 ; CM_SERVICE_SD_DISK_BOOT_LOAD
+HKR,Parameters,SdCmdFlags,1,    05,01, 06,01, 08,11, 09,19, 0A,19, 0D,11, \
+                                10,01, 11,01, 12,01, 17,01, 18,05, 19,05, \
+                                1A,01, 1B,01, 1C,01, \
+                                20,05, 21,05, 26,05, \
+                                2A,01, \
+                                34,02, 35,02, \
+                                37,01, 38,01, \
+                                22,01, 23,05, 24,01, 25,01
+
+HKR,Parameters,SdAppCmdFlags,1, 06,01, 0D,01, 16,01, 17,01, 33,01, \
+                                12,01, 19,01, 1A,01, 26,01, 2B,01, \
+                                2C,01, 2D,01, 2E,01, 2F,01, 30,01, 31,01
+
+[Strings]
+
+; Manufacturer
+RPI="Raspberry Pi"
+
+ACPI\BRCME88C.DeviceDesc="Broadcom SD Host (BRCME88C) for Raspberry Pi 4"
+SDHostBRCME88C_Slot="SD Host Slot %1!u!"
+
+ProviderString="WoR project"

@@ -1,0 +1,14 @@
+﻿Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\WMI\Autologger\SDHostBRCME88C]
+"Guid"="{62a2a14c-5448-4eca-b293-fe05f5eb89fc}"
+"BufferSize"=dword:00000040
+"LogFileMode"=dword:00080001
+"Status"=dword:00000000
+"Start"=dword:00000001
+
+[HKEY_LOCAL_MACHINE\SYSTEM\ControlSet001\Control\WMI\Autologger\SDHostBRCME88C\{f2782ab9-d1a5-5f95-240a-ac933a6937e2}]
+"Enabled"=dword:00000001
+"EnableLevel"=dword:00000004
+"EnableFlags"=dword:00000001
+"Status"=dword:00000000
