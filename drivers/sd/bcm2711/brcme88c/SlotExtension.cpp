@@ -60,10 +60,10 @@ FreeDmaMdl(_Pre_notnull_ __drv_freesMem(Mem) MDL* pDmaMdl)
 _IRQL_requires_max_(HIGH_LEVEL)
 static __forceinline
 UINT32
-PfnToLegacyMasterAddress(PFN_NUMBER pfn)
+PfnToLegacyMasterAddress(PFN_NUMBER pfn, UINT32 dmaTranslation)
 {
     NT_ASSERT(pfn < 0x3FFFFFFF / PAGE_SIZE);
-    return static_cast<UINT32>(pfn) * PAGE_SIZE + 0xC0000000;
+    return static_cast<UINT32>(pfn) * PAGE_SIZE + dmaTranslation;
 }
 
 _IRQL_requires_max_(HIGH_LEVEL)
@@ -74,6 +74,56 @@ MakeLargeInteger(ULONG value32)
     LARGE_INTEGER li = {};
     li.LowPart = value32;
     return li;
+}
+
+enum ChipModel : UINT16
+{
+    ChipModelBrcm2711 = 0x2711,
+};
+
+enum Brcm2711Stepping : UINT8
+{
+    Brcm2711SteppingB0 = 0x10,
+    Brcm2711SteppingC0 = 0x20,
+};
+
+union ChipRev
+{
+    ULONG U32;
+    struct
+    {
+        Brcm2711Stepping Stepping;
+        UINT8 Padding;
+        ChipModel Model;
+    };
+};
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+static ChipRev CODE_SEG_PAGE
+GetChipRev()
+{
+    static ULONG constexpr ID_CHIPREV = 0x7c404000 + 0x80000000;
+
+    ChipRev chipRev;
+
+    auto const pChipRev = (ULONG*)MmMapIoSpaceEx(
+        MakeLargeInteger(ID_CHIPREV),
+        sizeof(ULONG),
+        PAGE_READONLY | PAGE_NOCACHE);
+    if (!pChipRev)
+    {
+        chipRev.U32 = 0;
+        LogError("GetChipRev-MmMapIoSpaceEx");
+    }
+    else
+    {
+        chipRev.U32 = ReadULongNoFence(pChipRev);
+        MmUnmapIoSpace(pChipRev, sizeof(ULONG));
+        LogInfo("GetChipRev",
+            TraceLoggingHexInt32(chipRev.U32, "ChipRev"));
+    }
+
+    return chipRev;
 }
 
 static constexpr LARGE_INTEGER LargeInteger0 = MakeLargeInteger(0x0);
@@ -124,6 +174,24 @@ SlotExtension::SlotInitialize(
         LogError("SlotInitialize-BadLength",
             TraceLoggingValue(length));
         return STATUS_NOT_SUPPORTED;
+    }
+
+    // BRCME88C: DMA behavior depends on chip revision.
+    ChipRev chipRev = GetChipRev();
+    if (chipRev.Model != ChipModelBrcm2711)
+    {
+        LogWarning("SlotInitialize-BadChipModel",
+            TraceLoggingHexInt32(chipRev.U32, "ChipRev"));
+        m_dmaTranslation = 0xC0000000; // Fall back to Stepping-B0 behavior.
+    }
+    else if (chipRev.Stepping < Brcm2711SteppingC0)
+    {
+        m_dmaTranslation = 0xC0000000; // Stepping-B0.
+    }
+    else
+    {
+        // TODO: Use normal ScatterGatherDma for stepping C0.
+        m_dmaTranslation = 0;
     }
 
     // Preallocate DMA buffers based on expected maximum transfer size.
@@ -257,6 +325,7 @@ SlotExtension::SlotInitialize(
     SlotToggleEvents(0xFFFF, false);
 
     LogInfo("SlotInitialize",
+        TraceLoggingHexInt32(chipRev.U32, "ChipRev"),
         TraceLoggingUInt16(m_capabilities.SpecVersion, "SpecVersion"),
         TraceLoggingHexUInt8Array((UINT8*)&maxCurrents, 4, "Vdd1Max"),
         TraceLoggingHexInt64(regCaps.U64, "Capabilities"),
@@ -795,7 +864,7 @@ SlotExtension::AllocateDmaBuffers(ULONG cbDmaData)
         desc.Action = SdRegDmaActionAdma2Tran;
         desc.LengthHigh = 0;
         desc.Length = PAGE_SIZE;
-        desc.Address = PfnToLegacyMasterAddress(pPfns[i]);
+        desc.Address = PfnToLegacyMasterAddress(pPfns[i], m_dmaTranslation);
     }
 
     pDescriptors[0].End = true; // Set descriptor #0 as end-of-transfer.
@@ -1088,11 +1157,13 @@ SlotExtension::SendCommand(_Inout_ SDPORT_REQUEST* request)
                     return STATUS_NOT_SUPPORTED;
                 }
 
+                // TODO: Are these actually needed?
                 KeFlushIoBuffers(m_pDmaDescriptorMdl, true, true);
                 KeFlushIoBuffers(m_pDmaDataMdl, transferMode.DataTransferDirectionRead, true);
 
                 auto pfn = MmGetMdlPfnArray(m_pDmaDescriptorMdl)[0];
-                WRITE_REGISTER_NOFENCE_ULONG(&m_registers->AdmaSystemAddress, PfnToLegacyMasterAddress(pfn));
+                WRITE_REGISTER_NOFENCE_ULONG(&m_registers->AdmaSystemAddress,
+                    PfnToLegacyMasterAddress(pfn, m_dmaTranslation));
             }
             else
             {
@@ -1278,7 +1349,6 @@ SlotExtension::StartDmaTransfer(SDPORT_REQUEST* request)
 
     if (m_dmaInProgress == SdTransferDirectionRead)
     {
-        // TODO? Is there any buffer flushing that needs to happen here?
         memcpy(request->Command.DataBuffer, m_pDmaDataMdl->MappedSystemVa, request->Command.Length);
     }
 

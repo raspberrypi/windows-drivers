@@ -205,6 +205,7 @@ private:
     MDL* m_pDmaDescriptorMdl;
     UINT32 m_iDmaEndDescriptor; // The index of the descriptor where End == true.
     SDPORT_TRANSFER_DIRECTION m_dmaInProgress;
+    UINT32 m_dmaTranslation; // 0xC0000000 on old chips, 0x0 on new chips.
     Magic m_magic;
     bool m_crashDumpMode;
     bool m_regulatorVoltage1_8;
