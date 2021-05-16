@@ -72,13 +72,6 @@ HKR,Parameters,SdAppCmdFlags,1, 06,01, 0D,01, 16,01, 17,01, 33,01, \
                                 12,01, 19,01, 1A,01, 26,01, 2B,01, \
                                 2C,01, 2D,01, 2E,01, 2F,01, 30,01, 31,01, 33,01
 
-;
-; these modes require 1.8 V signaling, so are not yet supported
-;
-HKR, Parameters, DisableUhsSupport   ,%REG_DWORD%, 1
-HKR, Parameters, DisableHS200Support ,%REG_DWORD%, 1
-HKR, Parameters, DisableHS400Support ,%REG_DWORD%, 1
-
 ; //////////////////////////////////////////////////////////
 ;
 ; Controller Specific Sections
@@ -96,7 +89,14 @@ HKR, Parameters, DisableHS400Support ,%REG_DWORD%, 1
 ;       3 -> ADMA mode
 ;       4 -> System DMA (Texas Instruments OMAP specific)
 ;
+; TODO: Needed only for B0 stepping. C0 and later should enable DMA.
 HKR,, DmaMethod ,%REG_DWORD%, 1 ; PIO mode for now (we'll need a filter driver similar to rpiuxflt for DMA)
+;
+; OverrideFlags:
+;       0x10000000 -> Disable UHS (UHS requires voltage regulator control)
+;       0x00008000 -> Disable 8BIT (capabilities wrongly claim 8-bit bus support)
+;
+HKR,, OverrideFlags, %REG_DWORD%, 0x10008000
 
 [SDHostEMMC2]
 AddReg    = SDBUSReg
