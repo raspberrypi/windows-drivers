@@ -48,10 +48,11 @@ Needs = Generic.Install.NT.WMI
 
 [DeviceFlags.AddReg]
 ; Workaround to set device flags as used in usb\DisableFlags.ps1 from the HLK.
-; Use flags normally set for a 1106:3483 device enumerated by PCI plus Use32BitRegisterAccess.
+; Use flags normally set for a 1106:3483 device enumerated by PCI plus
+; Use32BitRegisterAccess (RPi PCIe limitations) and DisableStreams (to disable UAS).
 ; The !usb3kd.xhci_capability debugger extension command lists names of active flags.
 HKLM,System\CurrentControlSet\Control\Compatibility\Device\USBXHCI:ACPI!VEN_PNP&DEV_0D10,\
-    USBXHCI,0xB0001,0x70000000003
+    USBXHCI,0xB0001,0x70000040003
 
 [FilterInstall.NT.Copy]
 rpiuxflt.sys
