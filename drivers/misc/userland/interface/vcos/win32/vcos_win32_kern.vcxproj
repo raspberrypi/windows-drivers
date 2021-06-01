@@ -82,24 +82,36 @@
       <AdditionalDependencies>vcos_win32_kern_generic.lib;%(AdditionalDependencies);$(ConvertedTargetLibs);$(ConvertedUMLIBS)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OutputPath); $(OBJ_PATH)\..\generic\$(O)\</AdditionalLibraryDirectories>
     </Link>
+    <ClCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_NO_CRT_STDIO_INLINE</PreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
     <Link>
       <AdditionalDependencies>vcos_win32_kern_generic.lib;%(AdditionalDependencies);$(ConvertedTargetLibs);$(ConvertedUMLIBS)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OutputPath); $(OBJ_PATH)\..\generic\$(O)\</AdditionalLibraryDirectories>
     </Link>
+    <ClCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_NO_CRT_STDIO_INLINE</PreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <Link>
       <AdditionalDependencies>vcos_win32_kern_generic.lib;%(AdditionalDependencies);$(ConvertedTargetLibs);$(ConvertedUMLIBS)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OutputPath); $(OBJ_PATH)\..\generic\$(O)\</AdditionalLibraryDirectories>
     </Link>
+    <ClCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_NO_CRT_STDIO_INLINE</PreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <Link>
       <AdditionalDependencies>vcos_win32_kern_generic.lib;%(AdditionalDependencies);$(ConvertedTargetLibs);$(ConvertedUMLIBS)</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(OutputPath); $(OBJ_PATH)\..\generic\$(O)\</AdditionalLibraryDirectories>
     </Link>
+    <ClCompile>
+      <PreprocessorDefinitions>%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS;_NO_CRT_STDIO_INLINE</PreprocessorDefinitions>
+    </ClCompile>
   </ItemDefinitionGroup>
   <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'" Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" />
