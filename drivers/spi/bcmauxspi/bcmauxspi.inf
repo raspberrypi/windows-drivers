@@ -44,7 +44,6 @@ bcmauxspi.sys  = 1,,
 ; ones on XP and later.
 [Standard.NT$ARCH$]
 %bcmauxspi.DeviceDesc%=bcmauxspi_Device,ACPI\BCM2839,ACPI\BCMSPI1
-%bcmauxspi.DeviceDesc%=bcmauxspi_Device,ACPI\BCM2840
 
 [bcmauxspi_Device.NT]
 CopyFiles=Drivers_Dir
