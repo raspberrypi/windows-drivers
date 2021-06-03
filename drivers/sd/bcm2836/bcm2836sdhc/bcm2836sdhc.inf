@@ -26,14 +26,14 @@ bcm2836sdhc.sys		= 3426
 
 [ControlFlags]
 BasicDriverOk=*
-ExcludeFromSelect=ACPI\ARASAN
+ExcludeFromSelect=*
 ; ///////////////////////////////////////////////////////////
 ;
 ; Generic Device
 ;
 
 [Generic.NT$ARCH$]
-%ACPI\ARASAN.DeviceDesc%=SDHost, ACPI\ARASAN
+%ACPI\ARASAN.DeviceDesc%=SDHost, ACPI\BCM2847, ACPI\ARASAN
 ; ///////////////////////////////////////////////////////////
 ;
 ; Non-Generic Devices

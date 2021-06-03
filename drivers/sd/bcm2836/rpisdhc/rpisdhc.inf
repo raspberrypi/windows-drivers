@@ -26,7 +26,7 @@ rpisdhc.sys = 3426
 
 [ControlFlags]
 BasicDriverOk=*
-ExcludeFromSelect=ACPI\SDHST
+ExcludeFromSelect=*
 
 ; ///////////////////////////////////////////////////////////
 ;
@@ -34,7 +34,7 @@ ExcludeFromSelect=ACPI\SDHST
 ;
 
 [Generic.NT$ARCH$]
-%ACPI\SDHST.DeviceDesc%=SDHost, ACPI\SDHST
+%ACPI\SDHST.DeviceDesc%=SDHost, ACPI\BCM2855, ACPI\SDHST
 ; ///////////////////////////////////////////////////////////
 ;
 ; Non-Generic Devices
