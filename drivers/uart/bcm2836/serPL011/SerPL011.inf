@@ -62,10 +62,10 @@ Dependencies   = SerCx2
 AddReg         = BCM2837_Service_Reg
 
 [BCM2837_Service_Reg]
-HKR,Parameters,UartClockHz,0x00010001,0x00F42400 ; 16Mhz
+HKR,Parameters,UartClockHz,0x00010001,0x2DC6C00 ; 48Mhz
 HKR,Parameters,UartFlowControl,0x00010001,0x00000000; 0:None, 1:HW, 2:SW
 HKR,Parameters,UartControlLines,0x00010001,0x00000000; 0x0200:OUT2, 0x0100:OUT1, 0x0080:RTS, 0x0040:CTS, 0x0020:DTR
-HKR,Parameters,MaxBaudRateBPS,0x00010001,0x000E1000 ; 921600 BPS
+HKR,Parameters,MaxBaudRateBPS,0x00010001,0x2DC6C0 ; 3000000 BPS
 
 [Strings]
 ; localizable strings
