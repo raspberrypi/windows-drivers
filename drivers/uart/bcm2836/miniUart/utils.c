@@ -1569,4 +1569,252 @@ SerialCompleteRequest(
     WdfRequestCompleteWithInformation((Request), (Status), (Info));
 }
 
+/*++
 
+Routine Description:
+
+   Query the core clock frequency from RPIQ.
+
+Arguments:
+
+    ClockFrequencyPtr - Pointer to an ULONG representing the clock rate
+
+Return Value:
+
+    NTSTATUS
+
+--*/
+_Use_decl_annotations_
+NTSTATUS 
+QuerySystemClockFrequency(ULONG* ClockFrequencyPtr)
+{
+    PAGED_CODE();
+    NT_ASSERT(KeGetCurrentIrql() <= PASSIVE_LEVEL);
+
+    DECLARE_CONST_UNICODE_STRING(rpiqDeviceName, RPIQ_SYMBOLIC_NAME);
+
+    PFILE_OBJECT rpiqFileObject;
+
+    NTSTATUS status = OpenDevice(
+        &rpiqDeviceName,
+        GENERIC_READ,
+        FILE_SHARE_READ | FILE_SHARE_WRITE,
+        &rpiqFileObject);
+    if (!NT_SUCCESS(status)) {
+        TraceEvents(TRACE_LEVEL_ERROR, DBG_PNP,
+            "Failed to open handle to RPIQ. (status = %!STATUS!, rpiqDeviceName = %wZ)",
+            status,
+            &rpiqDeviceName);
+        return status;
+    }
+
+    // Build input buffer to query clock
+    MAILBOX_GET_CLOCK_RATE inputBuffer;
+    INIT_MAILBOX_GET_CLOCK_RATE(&inputBuffer, MAILBOX_CLOCK_ID_CORE);
+
+    ULONG_PTR information;
+    status = SendIoctlSynchronously(
+        rpiqFileObject,
+        IOCTL_MAILBOX_PROPERTY,
+        &inputBuffer,
+        sizeof(inputBuffer),
+        &inputBuffer,
+        sizeof(inputBuffer),
+        FALSE,                  // InternalDeviceIoControl
+        &information);
+    if (!NT_SUCCESS(status) ||
+        (inputBuffer.Header.RequestResponse != RESPONSE_SUCCESS)) {
+
+        TraceEvents(TRACE_LEVEL_ERROR, DBG_PNP,
+            "SendIoctlSynchronously(...IOCTL_MAILBOX_PROPERTY...) failed. (status = %!STATUS!, inputBuffer.Header.RequestResponse = 0x%x)",
+            status,
+            inputBuffer.Header.RequestResponse);
+        return status;
+    }
+
+    TraceEvents(TRACE_LEVEL_INFORMATION, DBG_PNP,
+        "Successfully queried system core clock. (inputBuffer.Rate = %d Hz)",
+        inputBuffer.Rate);
+
+    *ClockFrequencyPtr = inputBuffer.Rate;
+    return STATUS_SUCCESS;
+}
+
+/*++
+Routine Description:
+
+    Open a device.
+
+Arguments:
+
+    FileNamePtr    - Pointer to the device filename
+
+    DesiredAccess  - Desired access rights to the device
+
+    ShareAccess    - Type of share access
+
+    FileObjectPPtr - Pointer to the file object, in case of success
+
+Return value:
+
+    NTSTATUS
+
+--*/
+_Use_decl_annotations_
+NTSTATUS 
+OpenDevice(
+    const UNICODE_STRING* FileNamePtr,
+    ACCESS_MASK DesiredAccess,
+    ULONG ShareAccess,
+    FILE_OBJECT** FileObjectPPtr
+    )
+{
+    PAGED_CODE();
+    NT_ASSERT(KeGetCurrentIrql() <= PASSIVE_LEVEL);
+
+    OBJECT_ATTRIBUTES attributes;
+    InitializeObjectAttributes(
+        &attributes,
+        (UNICODE_STRING*)(FileNamePtr),
+        OBJ_KERNEL_HANDLE,
+        NULL,       // RootDirectory
+        NULL);      // SecurityDescriptor
+
+    HANDLE fileHandle;
+    IO_STATUS_BLOCK iosb;
+    NTSTATUS status = ZwCreateFile(
+        &fileHandle,
+        DesiredAccess,
+        &attributes,
+        &iosb,
+        NULL,                       // AllocationSize
+        FILE_ATTRIBUTE_NORMAL,
+        ShareAccess,
+        FILE_OPEN,
+        FILE_NON_DIRECTORY_FILE,    // CreateOptions
+        NULL,                       // EaBuffer
+        0);                         // EaLength
+
+    if (!NT_SUCCESS(status)) {
+        TraceEvents(TRACE_LEVEL_ERROR, DBG_PNP,
+            "ZwCreateFile(...) failed. (status = %!STATUS!, FileNamePtr = %wZ, DesiredAccess = 0x%x, ShareAccess = 0x%x)",
+            status,
+            FileNamePtr,
+            DesiredAccess,
+            ShareAccess);
+        return status;
+    }
+
+    status = ObReferenceObjectByHandleWithTag(
+        fileHandle,
+        DesiredAccess,
+        *IoFileObjectType,
+        KernelMode,
+        POOL_TAG,
+        (PVOID*)FileObjectPPtr,
+        NULL);   // HandleInformation
+
+    NTSTATUS closeStatus = ZwClose(fileHandle);
+    UNREFERENCED_PARAMETER(closeStatus);
+    NT_ASSERT(NT_SUCCESS(closeStatus));
+
+    if (!NT_SUCCESS(status)) {
+        TraceEvents(TRACE_LEVEL_ERROR, DBG_PNP,
+            "ObReferenceObjectByHandleWithTag(...) failed. (status = %!STATUS!)",
+            status);
+        return status;
+    }
+
+    NT_ASSERT(*FileObjectPPtr);
+    NT_ASSERT(NT_SUCCESS(status));
+    return STATUS_SUCCESS;
+}
+
+/*++
+Routine Description:
+
+    Synchronously send an IOCTL to a device.
+
+Arguments:
+
+    FileObjectPtr           - File object
+
+    IoControlCode           - IOCTL code
+
+    InputBufferPtr          - Pointer to the input buffer
+
+    InputBufferLength       - Size of the input buffer
+
+    OutputBufferPtr         - Pointer to the output buffer
+
+    OutputBufferLength      - Size of the output buffer
+
+    InternalDeviceIoControl - TRUE  -> sets the IRP's major function code to IRP_MJ_INTERNAL_DEVICE_CONTROL
+                              FALSE -> sets the IRP's major function code to IRP_MJ_DEVICE_CONTROL
+
+    InformationPtr          - Request-dependent information
+
+Return value:
+
+    NTSTATUS
+
+--*/
+_Use_decl_annotations_
+NTSTATUS 
+SendIoctlSynchronously(
+    FILE_OBJECT* FileObjectPtr,
+    ULONG IoControlCode,
+    PVOID InputBufferPtr,
+    ULONG InputBufferLength,
+    PVOID OutputBufferPtr,
+    ULONG OutputBufferLength,
+    BOOLEAN InternalDeviceIoControl,
+    ULONG_PTR* InformationPtr
+    )
+{
+    PAGED_CODE();
+    NT_ASSERT(KeGetCurrentIrql() <= PASSIVE_LEVEL);
+
+    KEVENT event;
+    KeInitializeEvent(&event, NotificationEvent, FALSE);
+
+    DEVICE_OBJECT* deviceObjectPtr = IoGetRelatedDeviceObject(FileObjectPtr);
+    IO_STATUS_BLOCK iosb;
+    IRP* irpPtr = IoBuildDeviceIoControlRequest(
+        IoControlCode,
+        deviceObjectPtr,
+        InputBufferPtr,
+        InputBufferLength,
+        OutputBufferPtr,
+        OutputBufferLength,
+        InternalDeviceIoControl,
+        &event,
+        &iosb);
+    if (!irpPtr) {
+        TraceEvents(TRACE_LEVEL_ERROR, DBG_PNP,
+            __FUNCTION__ "IoBuildDeviceIoControlRequest(...) failed. (IoControlCode=0x%x, deviceObjectPtr=%p, FileObjectPtr=%p)",
+            IoControlCode,
+            deviceObjectPtr,
+            FileObjectPtr);
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+
+    IO_STACK_LOCATION* irpSp = IoGetNextIrpStackLocation(irpPtr);
+    irpSp->FileObject = FileObjectPtr;
+
+    iosb.Status = STATUS_NOT_SUPPORTED;
+    NTSTATUS status = IoCallDriver(deviceObjectPtr, irpPtr);
+    if (status == STATUS_PENDING) {
+        KeWaitForSingleObject(
+            &event,
+            Executive,
+            KernelMode,
+            FALSE,          // Alertable
+            NULL);          // Timeout
+
+        status = iosb.Status;
+    }
+
+    *InformationPtr = iosb.Information;
+    return status;
+}

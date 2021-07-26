@@ -82,7 +82,6 @@ HKR,,SerialSkipExternalNaming,0x10001,0x1
 HKR,,RxFIFO,0x10001,0x8
 HKR,,TxFIFO,0x10001,0x8
 HKR,,Share System Interrupt,0x10001,0x1
-HKR,,ClockRate,0x10001,0xEE6B280 ; 250 MHz
 
 [Strings]
 ProviderString="MS-IOT"

@@ -879,11 +879,23 @@ SerialEvtPrepareHardware(
                                    &pConfig->PermitShare)) {
         pConfig->PermitShare = DriverDefaults.PermitShareDefault;
     }
-// 
+
+    // Try getting the core clock rate from registry. 
+    // If it's not set there, query from mailbox instead.
+
     if(!SerialGetRegistryKeyValue (Device,
                                    L"ClockRate",
                                    &pConfig->ClockRate)) {
-        pConfig->ClockRate = defaultClockRate;
+        status = QuerySystemClockFrequency(&pConfig->ClockRate);
+        if (!NT_SUCCESS(status)) {
+            TraceEvents(TRACE_LEVEL_ERROR,
+                DBG_PNP,
+                "Failed to query system clock frequency from RPIQ - falling back to default. (status = %!STATUS!, defaultClockRate = %d)",
+                status,
+                defaultClockRate);
+
+            pConfig->ClockRate = defaultClockRate;
+        }        
     }
 
     TraceEvents(TRACE_LEVEL_INFORMATION, DBG_PNP, 

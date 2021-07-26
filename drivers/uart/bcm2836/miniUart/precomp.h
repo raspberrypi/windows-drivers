@@ -30,6 +30,7 @@
 #define RESHUB_USE_HELPER_ROUTINES
 #include <reshub.h>
 #include <gpio.h>
+#include <rpiq.h>
 
 //
 // RPi3 mini Uart hardware as well as this driver supports higher baud rates, compared to

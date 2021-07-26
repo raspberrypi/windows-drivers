@@ -428,3 +428,26 @@ typedef struct _SERIAL_IOCTL_SYNC {
 
 #define SERIAL_TEST_REFERENCE(ReqContext, RefType) ((ULONG_PTR)ReqContext ->RefCount & RefType)
 
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS 
+QuerySystemClockFrequency(_Out_ ULONG* ClockFrequencyPtr);
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS 
+OpenDevice(
+    const UNICODE_STRING* FileNamePtr,
+    ACCESS_MASK DesiredAccess,
+    ULONG ShareAccess,
+    _Outptr_ FILE_OBJECT** FileObjectPPtr);
+
+_IRQL_requires_max_(PASSIVE_LEVEL)
+NTSTATUS 
+SendIoctlSynchronously(
+    FILE_OBJECT* FileObjectPtr,
+    ULONG IoControlCode,
+    _In_reads_bytes_(InputBufferLength) PVOID InputBufferPtr,
+    ULONG InputBufferLength,
+    _Out_writes_bytes_(OutputBufferLength) PVOID OutputBufferPtr,
+    ULONG OutputBufferLength,
+    BOOLEAN InternalDeviceIoControl,
+    _Out_ ULONG_PTR* InformationPtr);
