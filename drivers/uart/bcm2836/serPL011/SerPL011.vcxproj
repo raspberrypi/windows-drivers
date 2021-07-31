@@ -82,7 +82,6 @@
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppScanConfigurationData>PL011logging.h</WppScanConfigurationData>
       <EnablePREfast>false</EnablePREfast>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);_NO_CRT_STDIO_INLINE</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
@@ -94,7 +93,6 @@
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppScanConfigurationData>PL011logging.h</WppScanConfigurationData>
       <EnablePREfast>false</EnablePREfast>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);_NO_CRT_STDIO_INLINE</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
@@ -106,7 +104,6 @@
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppScanConfigurationData>PL011logging.h</WppScanConfigurationData>
       <EnablePREfast>false</EnablePREfast>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);_NO_CRT_STDIO_INLINE</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM64'">
@@ -118,7 +115,6 @@
       <WppPreprocessorDefinitions>ENABLE_WPP_RECORDER=1;WPP_EMIT_FUNC_NAME</WppPreprocessorDefinitions>
       <WppScanConfigurationData>PL011logging.h</WppScanConfigurationData>
       <EnablePREfast>false</EnablePREfast>
-      <PreprocessorDefinitions>%(PreprocessorDefinitions);_NO_CRT_STDIO_INLINE</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <!-- Set default environment variables, e.g. for stampinf -->

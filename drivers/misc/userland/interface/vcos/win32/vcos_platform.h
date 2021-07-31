@@ -135,6 +135,12 @@ extern "C" {
 
 RTL_RUN_ONCE_INIT_FN  InitHandleFunction;
 
+struct timespec
+{
+    time_t tv_sec;  // Seconds - >= 0
+    long   tv_nsec; // Nanoseconds - [0, 999999999]
+};
+
 #else
 
 BOOL CALLBACK InitHandleFunction (PINIT_ONCE InitOnce,
