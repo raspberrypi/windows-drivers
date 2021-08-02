@@ -231,6 +231,13 @@ PL011DeviceNotifyEvents(
         _In_ WDFDEVICE WdfDevice
         );
 
+    _IRQL_requires_max_(APC_LEVEL)
+    static NTSTATUS
+    PL011pReadDeviceSpecificData(
+        _In_  WDFDEVICE WdfDevice,
+        _Out_ ULONG* ClockFrequencyPtr
+        );
+
     _IRQL_requires_max_(PASSIVE_LEVEL)
     static NTSTATUS
     PL011pDeviceExtensionInit(

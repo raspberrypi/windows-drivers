@@ -73,7 +73,7 @@ typedef enum _PL011_REG_FILE {
 // (Can be overwritten by registry settings)
 //
 #define ONE_MHZ                     ULONG(1000000)
-#define PL011_DEAFULT_UART_CLOCK    ULONG(16 * ONE_MHZ)
+#define PL011_DEAFULT_UART_CLOCK    ULONG(48 * ONE_MHZ)
 
 
 //

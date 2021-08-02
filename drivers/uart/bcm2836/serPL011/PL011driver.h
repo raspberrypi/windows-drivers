@@ -30,6 +30,21 @@ WDF_EXTERN_C_START
 #define UART_CTRL_LINES__REG_VAL_NAME       L"UartControlLines"
 
 
+typedef struct _PL011_DRIVER_CONFIG_PARAMETER
+{
+    //
+    // Config parameter value
+    //
+    ULONG Value;
+
+    //
+    // FALSE -> if the value was successfully obtained from the registry
+    // TRUE  -> if a fallback (default) value was set
+    //
+    BOOLEAN IsFallbackValue;
+
+} PL011_DRIVER_CONFIG_PARAMETER;
+
 //
 // PL011_DRIVER_EXTENSION.
 //  Contains all The PL011 driver configuration parameters.
@@ -50,24 +65,24 @@ typedef struct _PL011_DRIVER_EXTENSION
     //
     // Max baud rate
     //
-    ULONG   MaxBaudRateBPS;
+    PL011_DRIVER_CONFIG_PARAMETER   MaxBaudRateBPS;
 
     //
     // UART clock.
     //
-    ULONG   UartClockHz;
+    PL011_DRIVER_CONFIG_PARAMETER   UartClockHz;
 
     //
     // Flow control supported by the 
     // board
     //
-    ULONG   UartFlowControl;
+    PL011_DRIVER_CONFIG_PARAMETER   UartFlowControl;
 
     //
     // Control line exposed by the 
     // board
     //
-    ULONG   UartControlLines;
+    PL011_DRIVER_CONFIG_PARAMETER   UartControlLines;
 
 } PL011_DRIVER_EXTENSION;
 

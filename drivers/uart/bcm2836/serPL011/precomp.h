@@ -26,6 +26,8 @@
 #include <ntintsafe.h>
 #include <ntstrsafe.h>
 #include <devpkey.h>
+#include <acpiioct.h>
+#include <acpiutil.hpp>
 
 // Class Extension includes
 #define RESHUB_USE_HELPER_ROUTINES

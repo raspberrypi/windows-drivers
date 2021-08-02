@@ -470,6 +470,168 @@ PL011DeviceNotifyEvents(
     } // Complete 'wait events', if any...
 }
 
+//
+// Routine Description:
+//
+//  Read device-specific data from ACPI.
+//
+// Arguments:
+//
+//  WdfDevice - The PL011 device instance
+//
+//  ClockFrequencyPtr - Pointer to an ULONG representing the clock frequency (Hz)
+//
+// Return Value:
+//
+//  NTSTATUS
+//
+_Use_decl_annotations_
+NTSTATUS
+PL011pReadDeviceSpecificData(
+    WDFDEVICE WdfDevice,
+    ULONG* ClockFrequencyPtr
+    )
+{
+    NT_ASSERT(KeGetCurrentIrql() <= APC_LEVEL);
+
+    if (ClockFrequencyPtr == nullptr)
+        return STATUS_INVALID_PARAMETER;
+
+    PDEVICE_OBJECT pdoPtr = WdfDeviceWdmGetPhysicalDevice(WdfDevice);
+    ACPI_EVAL_OUTPUT_BUFFER UNALIGNED* dsdBufferPtr = nullptr;
+    ACPI_EVAL_OUTPUT_BUFFER UNALIGNED* clckObjOutputBufferPtr = nullptr;
+    UINT32 clockFrequency = 0;
+    NTSTATUS status;
+
+    status = AcpiQueryDsd(pdoPtr, &dsdBufferPtr);
+    if (!NT_SUCCESS(status)) {
+        PL011_LOG_ERROR(
+            "AcpiQueryDsd failed. (status = %!STATUS!)", status
+        );
+        goto done;
+    }
+
+    const ACPI_METHOD_ARGUMENT UNALIGNED* devicePropertiesPkgPtr = nullptr;
+    status = AcpiParseDsdAsDeviceProperties(dsdBufferPtr, &devicePropertiesPkgPtr);
+    if (!NT_SUCCESS(status)) {
+        PL011_LOG_ERROR(
+            "AcpiParseDsdAsDeviceProperties failed. (status = %!STATUS!)", status
+        );
+        goto done;
+    }
+
+    const ACPI_METHOD_ARGUMENT UNALIGNED* currentPairEntryPtr = nullptr;
+    status = AcpiDevicePropertiesQueryValue(
+        devicePropertiesPkgPtr,
+        "clock-frequency",
+        &currentPairEntryPtr);
+
+    if (!NT_SUCCESS(status)) {
+        PL011_LOG_ERROR(
+            "AcpiDevicePropertiesQueryValue failed. (status = %!STATUS!)", status
+        );
+        goto done;
+    }
+
+    //
+    // Normally we expect an ACPI_METHOD_ARGUMENT_INTEGER,
+    // but our _DSD is declared as follows:
+    // 
+    //      Name(CLCK, 48000000)
+    //
+    //      Name(_DSD, Package()
+    //      {
+    //          ToUUID("daffd814-6eba-4d8c-8a91-bc9bbf4aa301"), Package()
+    //          {
+    //              Package(2) { "clock-frequency", CLCK },
+    //          }
+    //      })
+    // 
+    // The call above returns the string "CLCK", so we evaluate
+    // this object and get its argument.
+    //
+    if (currentPairEntryPtr->Type == ACPI_METHOD_ARGUMENT_STRING) {
+        CHAR objectName[ARRAYSIZE(ACPI_EVAL_INPUT_BUFFER::MethodName) + 1];
+        UINT32 length;
+
+        status = AcpiArgumentParseString(
+            currentPairEntryPtr,
+            ARRAYSIZE(objectName),
+            &length,
+            objectName);
+
+        if (!NT_SUCCESS(status)) {
+            PL011_LOG_ERROR(
+                "AcpiArgumentParseString failed. (status = %!STATUS!)", status
+            );
+            goto done;
+        }
+        
+        ACPI_EVAL_INPUT_BUFFER clckObjInputBuffer;
+
+        RtlZeroMemory(&clckObjInputBuffer, sizeof(clckObjInputBuffer));
+        clckObjInputBuffer.Signature = ACPI_EVAL_INPUT_BUFFER_SIGNATURE;
+        RtlCopyMemory(clckObjInputBuffer.MethodName, objectName, ARRAYSIZE(clckObjInputBuffer.MethodName));
+
+        status = AcpiEvaluateMethod(
+            pdoPtr,
+            &clckObjInputBuffer,
+            sizeof(ACPI_EVAL_INPUT_BUFFER),
+            &clckObjOutputBufferPtr);
+
+        if (!NT_SUCCESS(status)) {
+            PL011_LOG_ERROR(
+                "AcpiEvaluateMethod failed. (status = %!STATUS!)", status
+            );
+            goto done;
+        }
+
+        if (clckObjOutputBufferPtr->Count != 1) {
+            PL011_LOG_ERROR(
+                "clckObjOutputBufferPtr should've had 1 argument, but it has %u", 
+                clckObjOutputBufferPtr->Count
+            );
+            status = STATUS_ACPI_INCORRECT_ARGUMENT_COUNT;
+            goto done;
+        }
+
+        currentPairEntryPtr = nullptr;
+        status = AcpiOutputBufferGetNextArgument(clckObjOutputBufferPtr, &currentPairEntryPtr);
+        if (!NT_SUCCESS(status)) {
+            PL011_LOG_ERROR(
+                "AcpiOutputBufferGetNextArgument failed. (status = %!STATUS!)", status
+            );
+            goto done;
+        }
+    }
+
+    //
+    // Try to parse the argument as integer.
+    // currentPairEntryPtr points to either the value of the "clock-frequency" key
+    // or the argument of CLCK.
+    //
+    status = AcpiArgumentParseInteger(currentPairEntryPtr, &clockFrequency);
+    if (!NT_SUCCESS(status)) {
+        PL011_LOG_ERROR(
+            "AcpiArgumentParseInteger failed. (status = %!STATUS!)", status
+        );
+        goto done;
+    }
+
+    *ClockFrequencyPtr = static_cast<ULONG>(clockFrequency);
+
+done:
+
+    if (dsdBufferPtr != nullptr) {
+        ExFreePoolWithTag(dsdBufferPtr, ACPI_TAG_EVAL_OUTPUT_BUFFER);
+    }
+
+    if (clckObjOutputBufferPtr != nullptr) {
+        ExFreePoolWithTag(clckObjOutputBufferPtr, ACPI_TAG_EVAL_OUTPUT_BUFFER);
+    }
+
+    return status;
+}
 
 //
 // Routine Description:
@@ -503,8 +665,25 @@ PL011pDeviceExtensionInit(
     devExtPtr->OpenCount = 0;
     devExtPtr->ConfigLock = 0;
     devExtPtr->UartSupportedControlsMask = PL011_DEFAULT_SUPPORTED_CONTROLS;
-    devExtPtr->CurrentConfiguration.UartClockHz = drvExtPtr->UartClockHz;
-    devExtPtr->CurrentConfiguration.MaxBaudRateBPS = drvExtPtr->MaxBaudRateBPS;
+
+    if (drvExtPtr->UartClockHz.IsFallbackValue) {
+        NTSTATUS status = PL011pReadDeviceSpecificData(WdfDevice, &devExtPtr->CurrentConfiguration.UartClockHz);
+
+        if (!NT_SUCCESS(status)) {
+            PL011_LOG_WARNING(
+                "PL011pReadDeviceSpecificData failed. (status = %!STATUS!) -- falling back to defaults",
+                status
+            );
+            devExtPtr->CurrentConfiguration.UartClockHz = drvExtPtr->UartClockHz.Value;
+        }
+    }
+
+    if (drvExtPtr->MaxBaudRateBPS.IsFallbackValue) {
+        devExtPtr->CurrentConfiguration.MaxBaudRateBPS = devExtPtr->CurrentConfiguration.UartClockHz / 16;
+    } else {
+        devExtPtr->CurrentConfiguration.MaxBaudRateBPS = drvExtPtr->MaxBaudRateBPS.Value;
+    }
+
     KeInitializeSpinLock(&devExtPtr->Lock);
     KeInitializeSpinLock(&devExtPtr->RegsLock);
 
@@ -1323,18 +1502,18 @@ PL011pDeviceGetSupportedFeatures(
         PL011DeviceGetExtension(WdfDevice);
 
     USHORT uartFlowControlParams =
-        drvExtPtr->UartFlowControl & UART_SERIAL_FLAG_FLOW_CTL_MASK;
+        drvExtPtr->UartFlowControl.Value & UART_SERIAL_FLAG_FLOW_CTL_MASK;
 
     switch (uartFlowControlParams) {
 
     case UART_SERIAL_FLAG_FLOW_CTL_NONE:
     {
-        if ((drvExtPtr->UartControlLines & UART_SERIAL_LINES_RTS) != 0) {
+        if ((drvExtPtr->UartControlLines.Value & UART_SERIAL_LINES_RTS) != 0) {
 
             devExtPtr->UartSupportedControlsMask |= UARTCR_RTS;
         }
 
-        if ((drvExtPtr->UartControlLines & UART_SERIAL_LINES_DTR) != 0) {
+        if ((drvExtPtr->UartControlLines.Value & UART_SERIAL_LINES_DTR) != 0) {
 
             devExtPtr->UartSupportedControlsMask |= UARTCR_DTR;
         }
@@ -1354,12 +1533,12 @@ PL011pDeviceGetSupportedFeatures(
 
     case UART_SERIAL_FLAG_FLOW_CTL_HW:
     {
-        if ((drvExtPtr->UartControlLines & UART_SERIAL_LINES_RTS) != 0) {
+        if ((drvExtPtr->UartControlLines.Value & UART_SERIAL_LINES_RTS) != 0) {
 
             devExtPtr->UartSupportedControlsMask |= UARTCR_RTSEn;
         }
 
-        if ((drvExtPtr->UartControlLines & UART_SERIAL_LINES_CTS) != 0) {
+        if ((drvExtPtr->UartControlLines.Value & UART_SERIAL_LINES_CTS) != 0) {
 
             devExtPtr->UartSupportedControlsMask |= UARTCR_CTSEn;
         }
@@ -1381,11 +1560,11 @@ PL011pDeviceGetSupportedFeatures(
     //
     // Are IO pins OUT1,OUT2 exposed?
     //
-    if ((drvExtPtr->UartControlLines & UART_SERIAL_LINES_OUT1) != 0) {
+    if ((drvExtPtr->UartControlLines.Value & UART_SERIAL_LINES_OUT1) != 0) {
 
         devExtPtr->UartSupportedControlsMask |= UARTCR_Out1;
     }
-    if ((drvExtPtr->UartControlLines & UART_SERIAL_LINES_OUT2) != 0) {
+    if ((drvExtPtr->UartControlLines.Value & UART_SERIAL_LINES_OUT2) != 0) {
 
         devExtPtr->UartSupportedControlsMask |= UARTCR_Out2;
     }

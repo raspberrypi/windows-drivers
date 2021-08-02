@@ -273,13 +273,16 @@ PL011pDriverReadConfig()
         UNICODE_STRING valueName;
         RtlInitUnicodeString(&valueName, regValueDescPtr->ValueNameWsz);
 
-        ULONG value;
-        status = WdfRegistryQueryULong(driverRegkey, &valueName, &value);
+        PL011_DRIVER_CONFIG_PARAMETER configParam;
+        configParam.IsFallbackValue = FALSE;
+
+        status = WdfRegistryQueryULong(driverRegkey, &valueName, &configParam.Value);
         if (status == STATUS_OBJECT_NAME_NOT_FOUND) {
             //
             // Value not found, not an error, use default value.
             //
-            value = regValueDescPtr->DefaultValue;
+            configParam.Value = regValueDescPtr->DefaultValue;
+            configParam.IsFallbackValue = TRUE;
             status = STATUS_SUCCESS;
 
         } else if (!NT_SUCCESS(status)) {
@@ -293,8 +296,8 @@ PL011pDriverReadConfig()
 
         RtlCopyMemory(
             regValueDescPtr->ParamAddrPtr,
-            &value,
-            min(sizeof(ULONG), regValueDescPtr->ParamSize)
+            &configParam,
+            min(sizeof(PL011_DRIVER_CONFIG_PARAMETER), regValueDescPtr->ParamSize)
             );
 
     } // for (descriptors)
