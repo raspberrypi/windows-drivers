@@ -1,7 +1,10 @@
-name: push-build
+name: build
 
 on:
   push:
+    branches:
+      - master
+  pull_request:
     branches:
       - master
   schedule:
