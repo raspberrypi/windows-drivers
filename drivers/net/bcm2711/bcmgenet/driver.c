@@ -1,8 +1,15 @@
 #include <ntddk.h>
 #include <wdf.h>
 #include <ntintsafe.h>
+
+#ifdef NETADAPTERCX20_PREVIEW
 #include <preview/netadaptercx.h>
 #include <preview/netadapter.h>
+#else
+#include <netadaptercx.h>
+#include <netadapter.h>
+#endif
+
 #include <evntrace.h>
 #include <TraceLoggingProvider.h>
 #include <net/logicaladdress.h>
@@ -105,7 +112,11 @@ typedef struct GenetAdapter {
     NET_ADAPTER_LINK_LAYER_ADDRESS permanentMacAddress;
     NET_ADAPTER_LINK_LAYER_ADDRESS currentMacAddress;
     NET_PACKET_FILTER_FLAGS packetFilter;
-    ULONG numMulticastAddresses;
+#ifdef NETADAPTERCX20_PREVIEW
+    ULONG numMulticastAddresses;   
+#else
+    SIZE_T numMulticastAddresses;
+#endif
     NET_ADAPTER_LINK_LAYER_ADDRESS
     multicastAddresses[GENET_MAX_MULTICAST_ADDRESSES];
 } GenetAdapter;
@@ -423,7 +434,11 @@ static void GenetSetMacAddressFilters(GenetAdapter *adapter) {
     ULONG umacCmd;
     ULONG mdfCtrl = 0;
     ULONG curFilter = 0;
+#ifdef NETADAPTERCX20_PREVIEW
     ULONG curMulticast;
+#else
+    SIZE_T curMulticast;
+#endif
 
     umacCmd = GRD(adapter, UMAC.Cmd);
     if (adapter->packetFilter &
@@ -470,19 +485,25 @@ static void GenetReturnRxBuffer(
         (GenetRxBuffer *)returnContext;
 }
 
-static void GenetFillRxDesc(GenetAdapter *adapter, ULONG desc) {
-    GenetRxQueue *rxQueue = adapter->rxQueue;
-    GenetRxBuffer *rxBuffer;
+static GenetRxBuffer* GenetGetRxBuffer(GenetAdapter* adapter) {
+    GenetRxQueue* rxQueue = adapter->rxQueue;
+
+    NT_FRE_ASSERT(rxQueue->curFreeBuffer > 0);
+    return rxQueue->freeBuffers[--rxQueue->curFreeBuffer];
+}
+
+static void GenetFillRxDesc(GenetAdapter* adapter, ULONG desc,
+                            GenetRxBuffer* rxBuffer) {
+    GenetRxQueue* rxQueue = adapter->rxQueue;
 
     NT_FRE_ASSERT(desc < rxQueue->numDescs);
-    NT_FRE_ASSERT(rxQueue->curFreeBuffer > 0);
-    rxBuffer = rxQueue->freeBuffers[--rxQueue->curFreeBuffer];
     GWR(adapter, RDMA.BDs[desc].Address_Lo, (ULONG)rxBuffer->logicalAddress);
     GWR(adapter, RDMA.BDs[desc].Address_Hi,
         (ULONG)(rxBuffer->logicalAddress >> 32));
     rxQueue->descBuffers[desc] = rxBuffer;
 }
 
+#ifdef NETADAPTERCX20_PREVIEW
 static void GenetSetPacketFilter(NETADAPTER netAdapter,
                                  NET_PACKET_FILTER_FLAGS packetFilter) {
     GenetAdapter *adapter = GenetGetAdapterContext(netAdapter);
@@ -513,6 +534,34 @@ static void GenetSetMulticastList(
     GenetSetMacAddressFilters(adapter);
     WdfSpinLockRelease(adapter->lock);
 }
+#else
+static void GenetSetReceiveFilter(NETADAPTER netAdapter,
+    NETRECEIVEFILTER netReceiveFilter) {
+    GenetAdapter* adapter = GenetGetAdapterContext(netAdapter);
+    NET_PACKET_FILTER_FLAGS packetFilter =
+        NetReceiveFilterGetPacketFilter(netReceiveFilter);
+    SIZE_T multicastAddressCount =
+        NetReceiveFilterGetMulticastAddressCount(netReceiveFilter);
+    NET_ADAPTER_LINK_LAYER_ADDRESS const* multicastAddressList =
+        NetReceiveFilterGetMulticastAddressList(netReceiveFilter);
+
+    TraceInfo("Entry", TraceULX((ULONG)packetFilter, "PacketFilter"),
+              TraceUQX(multicastAddressCount, "MulticastAddresses"));
+    WdfSpinLockAcquire(adapter->lock);
+    adapter->packetFilter = packetFilter;
+    adapter->numMulticastAddresses = multicastAddressCount;
+    RtlZeroMemory(
+        adapter->multicastAddresses,
+        sizeof(NET_ADAPTER_LINK_LAYER_ADDRESS) * GENET_MAX_MULTICAST_ADDRESSES);
+    if (adapter->numMulticastAddresses != 0) {
+        RtlCopyMemory(adapter->multicastAddresses, multicastAddressList,
+                      sizeof(NET_ADAPTER_LINK_LAYER_ADDRESS) *
+                          adapter->numMulticastAddresses);
+    }
+    GenetSetMacAddressFilters(adapter);
+    WdfSpinLockRelease(adapter->lock);
+}
+#endif
 
 static NTSTATUS GenetAdapterStart(GenetAdapter *adapter) {
     NTSTATUS status;
@@ -521,8 +570,12 @@ static NTSTATUS GenetAdapterStart(GenetAdapter *adapter) {
     NET_ADAPTER_DMA_CAPABILITIES dmaCapabilities;
     NET_ADAPTER_TX_CAPABILITIES txCapabilities;
     NET_ADAPTER_RX_CAPABILITIES rxCapabilities;
+#ifdef NETADAPTERCX20_PREVIEW
     NET_ADAPTER_PACKET_FILTER_CAPABILITIES packetFilterCapabilities;
     NET_ADAPTER_MULTICAST_CAPABILITIES multicastCapabilities;
+#else
+    NET_ADAPTER_RECEIVE_FILTER_CAPABILITIES receiveFilterCapabilities;
+#endif
 
     NET_ADAPTER_LINK_STATE_INIT_DISCONNECTED(&linkState);
     NetAdapterSetLinkState(adapter->netAdapter, &linkState);
@@ -543,6 +596,7 @@ static NTSTATUS GenetAdapterStart(GenetAdapter *adapter) {
     NetAdapterSetDataPathCapabilities(adapter->netAdapter, &txCapabilities,
                                       &rxCapabilities);
 
+#ifdef NETADAPTERCX20_PREVIEW
     NET_ADAPTER_PACKET_FILTER_CAPABILITIES_INIT(&packetFilterCapabilities,
                                                 GENET_SUPPORTED_FILTERS,
                                                 GenetSetPacketFilter);
@@ -554,6 +608,15 @@ static NTSTATUS GenetAdapterStart(GenetAdapter *adapter) {
                                             GenetSetMulticastList);
     NetAdapterSetMulticastCapabilities(adapter->netAdapter,
                                        &multicastCapabilities);
+#else
+    NET_ADAPTER_RECEIVE_FILTER_CAPABILITIES_INIT(&receiveFilterCapabilities,
+                                                 GenetSetReceiveFilter);
+    receiveFilterCapabilities.SupportedPacketFilters = GENET_SUPPORTED_FILTERS;
+    receiveFilterCapabilities.MaximumMulticastAddresses =
+        GENET_MAX_MULTICAST_ADDRESSES;
+    NetAdapterSetReceiveFilterCapabilities(adapter->netAdapter,
+                                           &receiveFilterCapabilities);
+#endif
 
     status = NetAdapterStart(adapter->netAdapter);
 
@@ -795,8 +858,9 @@ static void GenetRxQueueAdvance(NETPACKETQUEUE netRxQueue) {
     NET_RING *packetRing = NetRingCollectionGetPacketRing(rxQueue->rings);
     ULONG fragmentIndex;
     ULONG packetIndex;
+    BOOLEAN descsRemaining = TRUE;
     BOOLEAN postedDescs = FALSE;
-    ULONG fragmentDesc;
+    ULONG fragmentDesc = 0;
     ULONG length_status;
     NET_FRAGMENT *fragment;
     NET_PACKET *packet;
@@ -806,47 +870,51 @@ static void GenetRxQueueAdvance(NETPACKETQUEUE netRxQueue) {
 
     fragmentIndex = fragmentRing->BeginIndex;
     packetIndex = packetRing->BeginIndex;
-    rxQueue->prodIndex =
-        GRD(adapter, RDMA.Rings[BG_DEFAULT_RING].TDMA_Cons_Index) & 0xffff;
-    while ((rxQueue->consIndex != rxQueue->prodIndex) &&
-           (fragmentIndex != fragmentRing->EndIndex) &&
+    if (!rxQueue->canceled) {
+        rxQueue->prodIndex =
+            GRD(adapter, RDMA.Rings[BG_DEFAULT_RING].TDMA_Cons_Index) & 0xffff;
+        descsRemaining = rxQueue->consIndex != rxQueue->prodIndex;
+    }
+    while (descsRemaining && (fragmentIndex != fragmentRing->EndIndex) &&
            (packetIndex != packetRing->EndIndex) && rxQueue->curFreeBuffer) {
-        postedDescs = TRUE;
-        fragmentDesc = rxQueue->consIndex % rxQueue->numDescs;
-        rxQueue->consIndex = (rxQueue->consIndex + 1) & 0xffff;
-        length_status = GRD(adapter, RDMA.BDs[fragmentDesc].Length_Status);
-        if (!(length_status & BG_DMA_BG_STATUS_EOP) ||
-            !(length_status & BG_DMA_BG_STATUS_SOP) ||
-            (length_status & BG_DMA_BG_STATUS_RX_ERRORS)) {
-            continue;
-        }
         fragment = NetRingGetFragmentAtIndex(fragmentRing, fragmentIndex);
         fragment->Capacity = GENET_RX_BUFFER_SIZE;
-        fragment->ValidLength = length_status >> BG_DMA_BD_LENGTH_SHIFT;
-        fragment->Offset = 2;
-        fragment->ValidLength -= 2;
         packet = NetRingGetPacketAtIndex(packetRing, packetIndex);
         packet->FragmentIndex = fragmentIndex;
         packet->FragmentCount = 1;
-        rxBuffer = rxQueue->descBuffers[fragmentDesc];
+        if (rxQueue->canceled) {
+            fragment->ValidLength = 0;
+            fragment->Offset = 0;
+            rxBuffer = GenetGetRxBuffer(adapter);
+        }
+        else {
+            postedDescs = TRUE;
+            fragmentDesc = rxQueue->consIndex % rxQueue->numDescs;
+            rxQueue->consIndex = (rxQueue->consIndex + 1) & 0xffff;
+            descsRemaining = rxQueue->consIndex != rxQueue->prodIndex;
+            length_status = GRD(adapter, RDMA.BDs[fragmentDesc].Length_Status);
+            if (!(length_status & BG_DMA_BG_STATUS_EOP) ||
+                !(length_status & BG_DMA_BG_STATUS_SOP) ||
+                (length_status & BG_DMA_BG_STATUS_RX_ERRORS)) {
+                continue;
+            }
+            fragment->ValidLength = length_status >> BG_DMA_BD_LENGTH_SHIFT;
+            fragment->Offset = 2;
+            fragment->ValidLength -= 2;
+            rxBuffer = rxQueue->descBuffers[fragmentDesc];
+        }
         returnContext = NetExtensionGetFragmentReturnContext(
             &rxQueue->returnContextExtension, fragmentIndex);
         returnContext->Handle = (NET_FRAGMENT_RETURN_CONTEXT_HANDLE)rxBuffer;
         virtualAddress = NetExtensionGetFragmentVirtualAddress(
             &rxQueue->virtualAddressExtension, fragmentIndex);
         virtualAddress->VirtualAddress = rxBuffer->virtualAddress;
-        KeFlushIoBuffers(&rxBuffer->rxMdl.mdl, TRUE, TRUE);
-        GenetFillRxDesc(adapter, fragmentDesc);
+        if (!rxQueue->canceled) {
+            KeFlushIoBuffers(&rxBuffer->rxMdl.mdl, TRUE, TRUE);
+            GenetFillRxDesc(adapter, fragmentDesc, GenetGetRxBuffer(adapter));
+        }
         fragmentIndex = NetRingIncrementIndex(fragmentRing, fragmentIndex);
         packetIndex = NetRingIncrementIndex(packetRing, packetIndex);
-    }
-    if (rxQueue->canceled) {
-        fragmentIndex = fragmentRing->EndIndex;
-        while (packetIndex != packetRing->EndIndex) {
-            packet = NetRingGetPacketAtIndex(packetRing, packetIndex);
-            packet->Ignore = 1;
-            packetIndex = NetRingIncrementIndex(packetRing, packetIndex);
-        }
     }
     fragmentRing->BeginIndex = fragmentIndex;
     packetRing->BeginIndex = packetIndex;
@@ -917,7 +985,7 @@ static void GenetRxQueueStart(NETPACKETQUEUE netRxQueue) {
 
     NT_FRE_ASSERT(rxQueue->curFreeBuffer >= rxQueue->numDescs);
     for (curDesc = 0; curDesc < rxQueue->numDescs; ++curDesc) {
-        GenetFillRxDesc(adapter, curDesc);
+        GenetFillRxDesc(adapter, curDesc, GenetGetRxBuffer(adapter));
     }
 
     regData = GRD(adapter, RDMA.Regs.Ctrl);
@@ -1309,10 +1377,8 @@ static NTSTATUS GenetCreateRxQueue(NETADAPTER netAdapter,
     rxQueue->rings = NetRxQueueGetRingCollection(netRxQueue);
     rxQueue->numDescs = BG_NUM_BDS;
     fragmentRing = NetRingCollectionGetFragmentRing(rxQueue->rings);
-    rxQueue->numBuffers = rxQueue->numDescs * 2;
-    if (fragmentRing->NumberOfElements > rxQueue->numBuffers) {
-        rxQueue->numBuffers = fragmentRing->NumberOfElements;
-    }
+    rxQueue->numBuffers =
+        rxQueue->numDescs * 2 + fragmentRing->NumberOfElements;
 
     WDF_OBJECT_ATTRIBUTES_INIT(&memoryAttributes);
     memoryAttributes.ParentObject = netRxQueue;

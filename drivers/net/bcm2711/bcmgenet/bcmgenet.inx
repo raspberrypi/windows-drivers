@@ -13,18 +13,22 @@ ExcludeFromSelect       = ACPI\BCM6E4E
 1                       = %DiskDescription%
 
 [SourceDisksFiles]
-bcmgenet.sys            = 1
+bcmgenet_netadaptercx20.sys = 1
+bcmgenet_netadaptercx21.sys = 1
 
 [DestinationDirs]
 DefaultDestDir          = 13
 
 [Manufacturer]
-%BCM%                   = BCM, NT$ARCH$.10.0...19041
+%BCM%                   = BCM, NT$ARCH$.10.0...19041, NT$ARCH$.10.0...19536
 
 [BCM.NT$ARCH$.10.0...19041]
-%BCMGENET.DeviceDesc%   = BCMGENET, ACPI\BCM6E4E
+%BCMGENET.DeviceDesc%   = BCMGENET_NETADAPTERCX20, ACPI\BCM6E4E
 
-[BCMGENET.NT]
+[BCM.NT$ARCH$.10.0...19536]
+%BCMGENET.DeviceDesc%   = BCMGENET_NETADAPTERCX21, ACPI\BCM6E4E
+
+[BCMGENET_NETADAPTERCX20.NT]
 FeatureScore            = 0xFE
 Characteristics         = 0x84  ; NCF_HAS_UI | NCF_PHYSICAL
 BusType                 = 15    ; PNPBus
@@ -36,27 +40,57 @@ BusType                 = 15    ; PNPBus
 *DirectionType          = 0     ; NET_IF_DIRECTION_SENDRECEIVE
 *AccessType             = 2     ; NET_IF_ACCESS_BROADCAST
 *HardwareLoopback       = 0
-CopyFiles               = BCMGENET.Copy
+CopyFiles               = BCMGENET_NETADAPTERCX20.Copy
 AddReg                  = BCMGENET.Ndi.AddReg
 AddReg                  = NetworkAddress.Kw.AddReg
 
-[BCMGENET.NT.Services]
-AddService              = %BCMGENET.SvcName%, 2, BCMGENET.AddService
+[BCMGENET_NETADAPTERCX21.NT]
+FeatureScore            = 0xFE
+Characteristics         = 0x84  ; NCF_HAS_UI | NCF_PHYSICAL
+BusType                 = 15    ; PNPBus
+*IfType                 = 6     ; IF_TYPE_ETHERNET_CSMACD
+*MediaType              = 0     ; NdisMedium802_3
+*PhysicalMediaType      = 14    ; NdisPhysicalMedium802_3
+*IfConnectorPresent     = 1
+*ConnectionType         = 1     ; NET_IF_CONNECTION_DEDICATED
+*DirectionType          = 0     ; NET_IF_DIRECTION_SENDRECEIVE
+*AccessType             = 2     ; NET_IF_ACCESS_BROADCAST
+*HardwareLoopback       = 0
+CopyFiles               = BCMGENET_NETADAPTERCX21.Copy
+AddReg                  = BCMGENET.Ndi.AddReg
+AddReg                  = NetworkAddress.Kw.AddReg
 
-[BCMGENET.Copy]
-bcmgenet.sys
+[BCMGENET_NETADAPTERCX20.NT.Services]
+AddService              = %BCMGENET.SvcName%, 2, BCMGENET_NETADAPTERCX20.AddService
+
+[BCMGENET_NETADAPTERCX21.NT.Services]
+AddService              = %BCMGENET.SvcName%, 2, BCMGENET_NETADAPTERCX21.AddService
+
+[BCMGENET_NETADAPTERCX20.Copy]
+bcmgenet_netadaptercx20.sys
+
+[BCMGENET_NETADAPTERCX21.Copy]
+bcmgenet_netadaptercx21.sys
 
 [BCMGENET.Ndi.AddReg]
 HKR, Ndi, Service, 0, %BCMGENET.SvcName%
 HKR, Ndi\Interfaces, UpperRange, 0, "ndis5"
 HKR, Ndi\Interfaces, LowerRange, 0, "ethernet"
 
-[BCMGENET.AddService]
+[BCMGENET_NETADAPTERCX20.AddService]
 DisplayName             = %BCMGENET.SvcDesc%
 ServiceType             = 1     ; SERVICE_KERNEL_DRIVER
 StartType               = 3     ; SERVICE_DEMAND_START
 ErrorControl            = 1     ; SERVICE_ERROR_NORMAL
-ServiceBinary           = %13%\bcmgenet.sys
+ServiceBinary           = %13%\bcmgenet_netadaptercx20.sys
+AddReg                  = BCMGENET.Service.AddReg
+
+[BCMGENET_NETADAPTERCX21.AddService]
+DisplayName             = %BCMGENET.SvcDesc%
+ServiceType             = 1     ; SERVICE_KERNEL_DRIVER
+StartType               = 3     ; SERVICE_DEMAND_START
+ErrorControl            = 1     ; SERVICE_ERROR_NORMAL
+ServiceBinary           = %13%\bcmgenet_netadaptercx21.sys
 AddReg                  = BCMGENET.Service.AddReg
 
 [BCMGENET.Service.AddReg]
