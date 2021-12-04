@@ -666,6 +666,8 @@ PL011pDeviceExtensionInit(
     devExtPtr->ConfigLock = 0;
     devExtPtr->UartSupportedControlsMask = PL011_DEFAULT_SUPPORTED_CONTROLS;
 
+    devExtPtr->CurrentConfiguration.UartClockHz = drvExtPtr->UartClockHz.Value;
+
     if (drvExtPtr->UartClockHz.IsFallbackValue) {
         NTSTATUS status = PL011pReadDeviceSpecificData(WdfDevice, &devExtPtr->CurrentConfiguration.UartClockHz);
 
@@ -674,7 +676,6 @@ PL011pDeviceExtensionInit(
                 "PL011pReadDeviceSpecificData failed. (status = %!STATUS!) -- falling back to defaults",
                 status
             );
-            devExtPtr->CurrentConfiguration.UartClockHz = drvExtPtr->UartClockHz.Value;
         }
     }
 
