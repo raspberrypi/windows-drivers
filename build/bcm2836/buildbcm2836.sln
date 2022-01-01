@@ -64,6 +64,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bcmgenet_netadaptercx21", "
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SDHostBRCME88C", "..\..\drivers\sd\bcm2711\brcme88c\SDHostBRCME88C.vcxproj", "{DC75D1FD-24D8-462B-8566-5E672802DDF3}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "rpirshub3", "..\..\drivers\usb\bcm2711\rpirshub3\rpirshub3.vcxproj", "{DFE53385-0150-401F-91D2-66587EF1927A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM
@@ -264,6 +266,18 @@ Global
 		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Release|ARM64.ActiveCfg = Release|ARM64
 		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Release|ARM64.Build.0 = Release|ARM64
 		{DC75D1FD-24D8-462B-8566-5E672802DDF3}.Release|ARM64.Deploy.0 = Release|ARM64
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Debug|ARM.ActiveCfg = Debug|ARM
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Debug|ARM.Build.0 = Debug|ARM
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Debug|ARM.Deploy.0 = Debug|ARM
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Debug|ARM64.ActiveCfg = Debug|ARM64
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Debug|ARM64.Build.0 = Debug|ARM64
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Debug|ARM64.Deploy.0 = Debug|ARM64
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Release|ARM.ActiveCfg = Release|ARM
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Release|ARM.Build.0 = Release|ARM
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Release|ARM.Deploy.0 = Release|ARM
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Release|ARM64.ActiveCfg = Release|ARM64
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Release|ARM64.Build.0 = Release|ARM64
+		{DFE53385-0150-401F-91D2-66587EF1927A}.Release|ARM64.Deploy.0 = Release|ARM64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
