@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<identity xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="BootFirmware" namespace="RPi" owner="$(OEMNAME)" legacyName="$(OEMNAME).RPi.BootFirmware" 
+    xmlns="urn:Microsoft.CompPlat/ManifestSchema.v1.00">
+    <onecorePackageInfo targetPartition="EFIESP" releaseType="Production" ownerType="OEM" />
+    <files>
+        <file destinationDir="$(runtime.bootDrive)" source="config.txt" />
+        <file destinationDir="$(runtime.bootDrive)" source="fixup4.dat" />
+        <file destinationDir="$(runtime.bootDrive)" source="RPI_EFI.fd" />
+        <file destinationDir="$(runtime.bootDrive)" source="start4.elf" />
+        <file destinationDir="$(runtime.bootDrive)" source="bcm2711-rpi-4-b.dtb" />
+        <file destinationDir="$(runtime.bootDrive)" source="bcm2711-rpi-400.dtb" />
+        <file destinationDir="$(runtime.bootDrive)" source="bcm2711-rpi-cm4.dtb" />
+    </files>
+</identity>

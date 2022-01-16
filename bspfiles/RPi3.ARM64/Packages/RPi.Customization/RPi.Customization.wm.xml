@@ -1,0 +1,19 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<identity xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    name="Customization"
+    namespace="RPi"
+    owner="$(OEMNAME)"
+    legacyName="$(OEMNAME).RPi.Customization" xmlns="urn:Microsoft.CompPlat/ManifestSchema.v1.00">
+    <onecorePackageInfo
+        targetPartition="MainOS"
+        releaseType="Production"
+        ownerType="OEM" />
+    <regKeys>
+        <regKey
+            keyName="$(hklm.windows)\CurrentVersion\Explorer\ActivateTimeout">
+            <regValue
+                type="REG_DWORD"
+                value="0x00007530" />
+        </regKey>
+    </regKeys>
+</identity>

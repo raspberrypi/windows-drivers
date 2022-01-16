@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<identity xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" name="BootFirmware" namespace="RPi" owner="$(OEMNAME)" legacyName="$(OEMNAME).RPi.BootFirmware" 
+    xmlns="urn:Microsoft.CompPlat/ManifestSchema.v1.00">
+    <onecorePackageInfo targetPartition="EFIESP" releaseType="Production" ownerType="OEM" />
+    <files>
+        <file destinationDir="$(runtime.bootDrive)" source="bootcode.bin" />
+        <file destinationDir="$(runtime.bootDrive)" source="config.txt" />
+        <file destinationDir="$(runtime.bootDrive)" source="fixup.dat" />
+        <file destinationDir="$(runtime.bootDrive)" source="RPI_EFI.fd" />
+        <file destinationDir="$(runtime.bootDrive)" source="start.elf" />
+        <file destinationDir="$(runtime.bootDrive)" source="bcm2710-rpi-3-b.dtb" />
+        <file destinationDir="$(runtime.bootDrive)" source="bcm2710-rpi-3-b-plus.dtb" />
+        <file destinationDir="$(runtime.bootDrive)" source="bcm2710-rpi-cm3.dtb" />
+    </files>
+</identity>
