@@ -1163,6 +1163,10 @@ static NTSTATUS GenetPrepareHardware(WDFDEVICE wdfDevice,
         return STATUS_NOT_FOUND;
     }
 
+    //
+    // FIXME: these registers don't return any PHY ID on the Pi 400 rev 1.1
+    // and possibly other boards using the same (unknown but similar enough?) chip.
+    //
     status = GenetPhyRead(adapter, BG_MII_PHYSID1, &phyIdReg);
     if (!NT_SUCCESS(status)) {
         return status;
@@ -1174,9 +1178,10 @@ static NTSTATUS GenetPrepareHardware(WDFDEVICE wdfDevice,
     }
     phyId |= phyIdReg;
     TraceInfo("PhyModel", TraceULX(phyId, "Id"));
-    if (phyId != BG_PHY_ID_BCM54213PE) {
+    NT_ASSERT(phyId == BG_PHY_ID_BCM54213PE);
+    /*if (phyId != BG_PHY_ID_BCM54213PE) {
         return STATUS_NOT_FOUND;
-    }
+    }*/
 
     if (!(GRD(adapter, Sys.RBuf_Flush_Ctrl) & BG_SYS_RBUF_FLUSH_RESET)) {
         adapter->permanentMacAddress.Length = ETHERNET_LENGTH_OF_ADDRESS;
