@@ -1,0 +1,85 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<FeatureManifest 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+  xmlns="http://schemas.microsoft.com/embedded/2004/10/ImageUpdate">
+  <BasePackages>
+    <!-- System Information package for providing system details , required for DM enrollment etc -->
+    <PackageFile Path="%PKGBLD_DIR%" Name="%OEM_NAME%.Device.SystemInformation.cab"/>
+    <!-- UEFI for the silicon packaged in Bootfirmware -->
+    <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.BootFirmware.cab"/>
+    <!-- Drivers required for boot/reading partitions for UpdateOS -->
+    <PackageFile Path="%BSPPKG_DIR%" Name="SV.PlatExtensions.UpdateOS.cab"/>
+    <!-- MBR BCD Settings : Include IOT_EFIESP_BCD_MBR -->
+    <!-- Device Info/ Device Targeting Info : Include IOT_GENERIC_POP in OEMInput xml file -->
+    <!-- Mandatory device drivers -->
+    <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.bcm2836sdhc.cab"/>    
+    <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.SDHostBRCME88C.cab"/>    
+    <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.rpiuxflt.cab"/>    
+    <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.rpirshub3.cab"/>    
+    <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.rpiq.cab"/>
+    <!-- Device specific customisations if any -->
+    <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.Customization.cab" />
+  </BasePackages>
+  <DeviceLayoutPackages>
+    <!-- MBR 4GB layout  -->
+    <PackageFile SOC="RPi" Path="%PKGBLD_DIR%" Name="%OEM_NAME%.DeviceLayout.MBR4GB.cab"/>
+    <!-- MBR 8GB layout - select this by specifying the SOC field in the OEMInput xml file -->
+    <PackageFile SOC="RPi-R" Path="%PKGBLD_DIR%" Name="%OEM_NAME%.DeviceLayout.MBR8GB-R.cab"/>
+  </DeviceLayoutPackages>
+  <OEMDevicePlatformPackages>
+    <!-- MBR 4GB layout  -->
+    <PackageFile Device="RPi" Path="%PKGBLD_DIR%" Name="%OEM_NAME%.DeviceLayout.MBR4GB.cab"/>
+    <!-- MBR 8GB layout - select this by specifying the SOC field in the OEMInput xml file -->
+    <PackageFile Device="RPi-R" Path="%PKGBLD_DIR%" Name="%OEM_NAME%.DeviceLayout.MBR8GB-R.cab"/>
+  </OEMDevicePlatformPackages>
+  
+  <Features>
+    <Microsoft />
+    <MSFeatureGroups />
+    <OEM>
+      <!-- Optional Device Drivers -->
+      <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.bcm2836pwm.cab">
+        <FeatureIDs>
+          <FeatureID>RPI_DRIVERS</FeatureID>
+        </FeatureIDs>
+      </PackageFile>
+      <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.rpiwav.cab">
+        <FeatureIDs>
+          <FeatureID>RPI_DRIVERS</FeatureID>
+        </FeatureIDs>
+      </PackageFile>
+      <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.SerPL011.cab">
+        <FeatureIDs>
+          <FeatureID>RPI_DRIVERS</FeatureID>
+        </FeatureIDs>
+      </PackageFile>
+      <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.bcmgpio.cab">
+        <FeatureIDs>
+          <FeatureID>RPI_DRIVERS</FeatureID>
+        </FeatureIDs>
+      </PackageFile>
+      <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.bcmi2c.cab">
+        <FeatureIDs>
+          <FeatureID>RPI_DRIVERS</FeatureID>
+        </FeatureIDs>
+      </PackageFile>
+      <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.bcmspi.cab">
+        <FeatureIDs>
+          <FeatureID>RPI_DRIVERS</FeatureID>
+        </FeatureIDs>
+      </PackageFile>
+      <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.bcmauxspi.cab">
+        <FeatureIDs>
+          <FeatureID>RPI_DRIVERS</FeatureID>
+        </FeatureIDs>
+      </PackageFile>
+      <PackageFile Path="%BSPPKG_DIR%" Name="%OEM_NAME%.RPi.piminiuart.cab">
+        <FeatureIDs>
+          <FeatureID>RPI_DRIVERS</FeatureID>
+        </FeatureIDs>
+      </PackageFile>
+    </OEM>
+    <OEMFeatureGroups />
+  </Features>
+</FeatureManifest>

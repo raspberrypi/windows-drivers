@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<identity xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    name="SerPL011"
+    namespace="RPi"
+    owner="$(OEMNAME)"
+    legacyName="$(OEMNAME).RPi.SerPL011" xmlns="urn:Microsoft.CompPlat/ManifestSchema.v1.00">
+    <onecorePackageInfo
+        targetPartition="MainOS"
+        releaseType="Production"
+        ownerType="OEM" />
+    <drivers>
+        <driver>
+            <inf source="$(_RELEASEDIR)SerPL011.inf" />
+        </driver>
+    </drivers>
+</identity>

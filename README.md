@@ -17,7 +17,7 @@ For the Raspberry Pi 2 (v1.2) and Raspberry Pi 3, the Pi Firmware Task Force pro
 
 ## 32-bit firmware
 
-Sample binaries of the firmware is included in [RPi.BootFirmware](bspfiles/Packages/RPi.BootFirmware) to enable quick prototyping. The sources for these binaries are listed below.
+Sample binaries of the firmware is included in [RPi.BootFirmware](bspfiles/RPi/Packages/RPi.BootFirmware) to enable quick prototyping. The sources for these binaries are listed below.
 
 1. Firmware binaries : [RaspberryPi/Firmware](https://github.com/raspberrypi/firmware)
 2. UEFI Sources : [RPi/UEFI](https://github.com/ms-iot/RPi-UEFI)
@@ -40,20 +40,41 @@ See [PlatformSmbiosDxe.c](https://github.com/ms-iot/RPi-UEFI/blob/ms-iot/Pi3Boar
 
 The resulting driver binaries will be located in the `windows-drivers\build\bcm2836\ARM\Output` folder, or `windows-drivers\build\bcm2836\ARM64\Output` if you picked an Arm 64-bit configuration.
 
-## Export the bsp
+## 64-bit IoT Core
 
-Note: this section is only applicable to Windows 10 IoT Core.
+This repo provides experimental ARM64 IoT Core support for Raspberry Pi 3 and 4.
+
+Please refer to [IOTARM64.md](IOTARM64.md) for more information.
+
+## Export the 32-bit BSP
+
+Note: this section is only applicable to 32-bit Windows 10 IoT Core for Raspberry Pi 3 and earlier, please refer to [IOTARM64.md](IOTARM64.md) for the experimental 64-bit BSP.
 
 We provide a `binexport.ps1` script to scrape the BSP components together into a zip file for easy use with the IoT ADK AddonKit.
 1. Open Powershell
 2. Navigate to rpi-iotcore\tools
 3. Run `binexport.ps1` with the appropriate arguments.
     ```powershell
-    .\binexport.ps1 C:\Release
-    (or)
-    .\binexport.ps1 C:\Release -IsDebug # for debug binaries
+    # Platform:
+    #    RPi        - Raspberry Pi 2/3 32-bit BSP
+    #    RPi3.ARM64 - Raspberry Pi 3   64-bit BSP (experimental)
+    #    RPi4.ARM64 - Raspberry Pi 4   64-bit BSP (experimental)
+
+    # OutputDir
+    #    The output directory for the BSP zip file.
+
+    # IsDebug
+    #    Specify to package debug binaries. Default is Release binaries.
+    .\binexport.ps1 [Platform] [OutputDir] [-IsDebug]
+
+    # Samples
+    # 32-bit BSP for Raspberry Pi 2/3, release binaries
+    .\binexport.ps1 RPi C:\Release
+
+    # 32-bit BSP for Raspberry Pi 2/3, debug binaries
+    .\binexport.ps1 RPi C:\Debug -IsDebug
     ```
-4. The script will generate a zip file **RPi_BSP_xx.zip** that can be imported into the IoT-ADK-Addonkit shell using [Import-IoTBSP](https://github.com/ms-iot/iot-adk-addonkit/blob/master/Tools/IoTCoreImaging/Docs/Import-IoTBSP.md).
-    ```powershell
-    Import-IoTBSP RPi C:\Temp\RPi_BSP_xx.zip
+4. The script will generate a zip file **RPi.BSP.xx.zip** that can be imported into the IoT-ADK-Addonkit shell using [Import-IoTBSP](https://github.com/ms-iot/iot-adk-addonkit/blob/master/Tools/IoTCoreImaging/Docs/Import-IoTBSP.md).
+    ```powershell   
+    Import-IoTBSP RPi C:\Temp\RPi.BSP.xx.zip
     ```

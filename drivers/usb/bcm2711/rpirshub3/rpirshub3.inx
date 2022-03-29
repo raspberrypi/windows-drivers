@@ -1,0 +1,33 @@
+[Version]
+Signature = "$Windows NT$"
+Class = USB
+ClassGUID = {36FC9E60-C465-11CF-8056-444553540000}
+Provider = %ProviderString%
+CatalogFile = rpirshub3.cat
+PnpLockdown = 1
+
+[Manufacturer]
+%RPi% = RPi,NT$ARCH$.10.0
+
+[RPi.NT$ARCH$.10.0]
+; Install the USB Root Hub on builds (RS5 or earlier) with broken XHCI driver
+; On these builds, the Hardware ID of the root hub would become B\ROOT_HUB30# instead of the normal
+; USB\ROOT_HUB30 and the stock INF will fail to work.
+%rpirshub3.DeviceDesc% = QuirkHubInstall, B\ROOT_HUB30#
+
+[QuirkHubInstall.NT]
+Include = usbhub3.inf
+Needs = Generic.Install.NT
+
+[QuirkHubInstall.NT.Services]
+Include = usbhub3.inf
+Needs = Generic.Install.NT.Services
+
+[QuirkHubInstall.NT.WMI]
+Include = usbhub3.inf
+Needs = Generic.Install.NT.WMI
+
+[Strings]
+ProviderString = "Open Source"
+RPi = "Raspberry Pi"
+rpirshub3.DeviceDesc = "USB 3.0 XHCI Root Hub"
